@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuelvia — Lead Generation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --black:    #0a0a0a;
+            --offblack: #1a1a1a;
+            --charcoal: #2e2e2e;
+            --mid:      #6b6b6b;
+            --light:    #d4d4d4;
+            --offwhite: #f5f5f3;
+            --white:    #ffffff;
+            --success:  #2d6a4f;
+            --danger:   #7b2d2d;
+            --warn:     #7a5c00;
+            --serif:    'Playfair Display', Georgia, 'Times New Roman', serif;
+            --body:     'Lora', Georgia, serif;
+        }
+
+        body { font-family: var(--body); background: var(--offwhite); color: var(--black); overflow-x: hidden; }
+
+        /* ── SIDEBAR ─────────────────────────────────────────────────── */
+        .sidebar {
+            position: fixed; left: 0; top: 0;
+            width: 264px; height: 100vh;
+            background: var(--black);
+            display: flex; flex-direction: column;
+            padding: 36px 0; z-index: 1000;
+            border-right: 1px solid var(--offblack);
+            overflow-y: auto;
+        }
+        .logo { padding: 0 28px 32px; border-bottom: 1px solid var(--charcoal); margin-bottom: 28px; }
+        .logo-wordmark { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--white); letter-spacing: 0.5px; }
+        .logo-sub { font-size: 11px; color: var(--mid); letter-spacing: 2px; text-transform: uppercase; margin-top: 3px; font-family: var(--body); }
+
+        .nav-section { padding: 0 14px; margin-bottom: 28px; }
+        .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--charcoal); padding: 0 10px; margin-bottom: 8px; }
+
+        .nav-item {
+            padding: 11px 12px; margin-bottom: 2px; border-radius: 6px; cursor: pointer;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: var(--mid); font-family: var(--body);
+            transition: background 0.15s, color 0.15s; border: 1px solid transparent;
+        }
+        .nav-item:hover { background: var(--offblack); color: var(--light); }
+        .nav-item.active { background: var(--white); color: var(--black); font-weight: 600; }
+        .nav-icon { font-size: 14px; opacity: 0.85; }
+
+        /* ── CAMPAIGN ACTION BUTTONS in sidebar ─────────────────────── */
+        .campaign-btn {
+            width: 100%; margin-bottom: 6px; padding: 12px 12px 10px;
+            background: transparent; border: 1px solid #2a2a2a;
+            border-radius: 6px; cursor: pointer; text-align: left;
+            font-family: var(--body); transition: all 0.15s;
+            display: block;
+        }
+        .campaign-btn:hover { background: var(--offblack); border-color: var(--charcoal); }
+        .campaign-btn.active-action { border-color: #3a5c3a; background: #0f1f0f; }
+        .campaign-btn-title { font-size: 13px; font-weight: 600; color: var(--light); display: flex; align-items: center; gap: 8px; }
+        .campaign-btn-desc  { font-size: 10.5px; color: var(--mid); margin-top: 3px; padding-left: 22px; line-height: 1.4; }
+
+        .sidebar-footer { margin-top: auto; padding: 20px 14px 0; border-top: 1px solid var(--charcoal); }
+        .btn-logout {
+            width: 100%; padding: 10px 12px;
+            background: transparent; border: 1px solid var(--charcoal);
+            color: var(--mid); border-radius: 6px; font-size: 13px;
+            font-family: var(--body); cursor: pointer; text-align: left; transition: all 0.15s;
+        }
+        .btn-logout:hover { border-color: var(--light); color: var(--white); }
+
+        /* ── MAIN ────────────────────────────────────────────────────── */
+        .main { margin-left: 264px; min-height: 100vh; background: var(--offwhite); }
+        .topbar {
+            background: var(--white); border-bottom: 1px solid var(--light);
+            padding: 18px 40px; display: flex; justify-content: space-between;
+            align-items: center; position: sticky; top: 0; z-index: 100;
+        }
+        .page-title { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--black); letter-spacing: -0.3px; }
+        .topbar-time { font-size: 12px; color: var(--mid); font-family: var(--body); }
+        .content { padding: 36px 40px; }
+
+        /* ── STAT CARDS ──────────────────────────────────────────────── */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+        .stat-card { background: var(--white); border: 1px solid var(--light); border-radius: 8px; padding: 24px; transition: border-color 0.15s; }
+        .stat-card:hover { border-color: var(--charcoal); }
+        .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--mid); margin-bottom: 14px; }
+        .stat-value { font-family: var(--serif); font-size: 38px; font-weight: 700; color: var(--black); line-height: 1; margin-bottom: 8px; }
+        .stat-sub { font-size: 12px; color: var(--mid); }
+
+        /* ── CARDS ───────────────────────────────────────────────────── */
+        .card { background: var(--white); border: 1px solid var(--light); border-radius: 8px; padding: 28px; margin-bottom: 24px; }
+        .card-title { font-family: var(--serif); font-size: 18px; font-weight: 700; color: var(--black); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--offwhite); padding-bottom: 16px; }
+
+        /* ── TABLES ──────────────────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; }
+        thead { border-bottom: 2px solid var(--black); }
+        th { padding: 12px 14px; text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--charcoal); font-family: var(--body); }
+        td { padding: 13px 14px; border-bottom: 1px solid var(--offwhite); font-size: 13px; font-family: var(--body); color: var(--black); }
+        tbody tr:hover { background: #fafaf8; }
+
+        /* ── BADGES ──────────────────────────────────────────────────── */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; font-family: var(--body); }
+        .badge-new            { background: #f0faf5; color: #1a5c3a; border: 1px solid #b4dfc9; }
+        .badge-contacted      { background: #f0f0ff; color: #3333aa; border: 1px solid #c0c0ee; }
+        .badge-replied        { background: #fffbf0; color: #7a5c00; border: 1px solid #e6d48c; }
+        .badge-follow-up-sent { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
+        .badge-follow-up-1    { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
+        .badge-closed         { background: #f5f5f5; color: #555; border: 1px solid #ddd; }
+
+        /* ── FORMS ───────────────────────────────────────────────────── */
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 7px; }
+        label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--charcoal); font-family: var(--body); }
+        input, select { padding: 10px 14px; background: var(--white); border: 1px solid var(--light); border-radius: 6px; color: var(--black); font-size: 13.5px; font-family: var(--body); transition: border-color 0.15s; appearance: none; -webkit-appearance: none; }
+        input:focus, select:focus { outline: none; border-color: var(--black); }
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b6b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+
+        /* ── BUTTONS ─────────────────────────────────────────────────── */
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        .btn { padding: 10px 22px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: var(--body); cursor: pointer; border: 1px solid transparent; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+        .btn-primary   { background: var(--black); color: var(--white); border-color: var(--black); }
+        .btn-primary:hover { background: var(--offblack); }
+        .btn-secondary { background: var(--white); color: var(--black); border-color: var(--light); }
+        .btn-secondary:hover { border-color: var(--charcoal); }
+        .btn-danger    { background: #5c1a1a; color: var(--white); }
+        .btn-danger:hover { background: #401010; }
+        .btn-warning   { background: #5c4300; color: var(--white); }
+        .btn-warning:hover { background: #403000; }
+        .btn.hidden { display: none !important; }
+
+        /* ── PROGRESS ────────────────────────────────────────────────── */
+        .progress-container { margin: 20px 0; }
+        .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px; font-family: var(--body); color: var(--mid); }
+        .progress-bar { width: 100%; height: 6px; background: var(--offwhite); border-radius: 3px; overflow: hidden; border: 1px solid var(--light); }
+        .progress-fill { height: 100%; background: var(--black); border-radius: 3px; transition: width 0.4s ease; }
+
+        /* ── STATUS BADGE ────────────────────────────────────────────── */
+        .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--white); border: 1px solid var(--light); border-radius: 20px; font-size: 11.5px; font-weight: 600; font-family: var(--body); text-transform: uppercase; letter-spacing: 0.5px; color: var(--charcoal); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--light); }
+        .status-dot.running   { background: #1a5c3a; animation: pulse 1.5s infinite; }
+        .status-dot.paused    { background: #7a5c00; }
+        .status-dot.completed { background: var(--black); }
+        .status-dot.stopped   { background: #7b2d2d; }
+        .status-dot.error     { background: #7b2d2d; }
+        .status-dot.idle      { background: var(--light); }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* ── LOGS BOX ────────────────────────────────────────────────── */
+        .logs-box { background: var(--black); border-radius: 6px; padding: 16px; max-height: 380px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 12px; border: 1px solid var(--offblack); }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #1a1a1a; color: #888; line-height: 1.5; }
+        .log-entry.log-ok   { color: #6fcf97; font-weight: 600; }
+        .log-entry.log-err  { color: #eb5757; }
+        .log-entry.log-warn { color: #f2c94c; }
+        .log-entry.log-done { color: #ffffff; font-weight: 700; }
+
+        /* ── MINI STATS ──────────────────────────────────────────────── */
+        .mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+        .mini-stat { background: var(--offwhite); border: 1px solid var(--light); border-radius: 6px; padding: 18px 16px; }
+        .mini-stat-label { font-size: 11px; color: var(--mid); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .mini-stat-value { font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--black); }
+        .mini-stat-sub   { font-size: 11px; color: var(--mid); margin-top: 5px; }
+
+        /* ── INFO BOX ────────────────────────────────────────────────── */
+        .info-box { background: var(--white); border: 1px solid var(--light); border-left: 3px solid var(--black); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; color: var(--charcoal); line-height: 1.6; }
+        .info-box strong { color: var(--black); }
+
+        /* ── INTELLIGENCE ────────────────────────────────────────────── */
+        .niche-card { background: var(--offwhite); border: 1px solid var(--light); border-radius: 6px; padding: 16px; }
+        .niche-card-name { font-weight: 700; font-size: 13.5px; margin-bottom: 8px; }
+        .niche-card-stats { font-size: 12px; color: var(--mid); line-height: 1.7; }
+        .niche-card-health { font-size: 12px; font-weight: 600; margin-top: 8px; color: var(--charcoal); }
+
+        /* ── UTILITIES ───────────────────────────────────────────────── */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .text-mid { color: var(--mid); }
+        .mt-20 { margin-top: 20px; }
+        .mt-24 { margin-top: 24px; }
+
+        /* ── SCROLLBAR ───────────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--offwhite); }
+        ::-webkit-scrollbar-thumb { background: var(--light); border-radius: 3px; }
+
+        /* ── LOGIN ───────────────────────────────────────────────────── */
+        #login-screen { display: flex; height: 100vh; align-items: center; justify-content: center; background: var(--offwhite); }
+        .login-box { background: var(--white); border: 1px solid var(--light); border-radius: 8px; padding: 48px 40px; width: 380px; text-align: center; }
+        .login-logo { font-family: var(--serif); font-size: 28px; font-weight: 700; color: var(--black); margin-bottom: 6px; }
+        .login-tagline { font-size: 12px; color: var(--mid); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 36px; }
+        .login-box input { width: 100%; margin-bottom: 14px; font-size: 14px; padding: 12px 16px; }
+        .login-box .btn { width: 100%; justify-content: center; font-size: 14px; padding: 12px; }
+        .login-foot { font-size: 11px; color: var(--light); margin-top: 20px; }
+
+        /* ── DETAIL MODAL ────────────────────────────────────────────── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,10,10,0.55); z-index: 9000; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: var(--white); border-radius: 10px; border: 1px solid var(--light); width: min(700px, 94vw); max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,0.22); }
+        .modal-header { padding: 22px 28px 16px; border-bottom: 1px solid var(--offwhite); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+        .modal-title { font-family: var(--serif); font-size: 17px; font-weight: 700; color: var(--black); line-height: 1.3; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--mid); padding: 0 4px; line-height: 1; flex-shrink: 0; }
+        .modal-close:hover { color: var(--black); }
+        .modal-meta { padding: 14px 28px; border-bottom: 1px solid var(--offwhite); display: flex; gap: 24px; flex-wrap: wrap; background: var(--offwhite); }
+        .modal-meta-item { display: flex; flex-direction: column; gap: 3px; }
+        .modal-meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); font-family: var(--body); }
+        .modal-meta-value { font-size: 13px; color: var(--black); font-family: var(--body); }
+        .modal-body { padding: 22px 28px; overflow-y: auto; flex: 1; }
+        .modal-body-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--mid); margin-bottom: 10px; font-family: var(--body); }
+        .modal-message { white-space: pre-wrap; font-family: var(--body); font-size: 13.5px; line-height: 1.75; color: var(--black); background: var(--offwhite); border: 1px solid var(--light); border-radius: 6px; padding: 16px 18px; max-height: 400px; overflow-y: auto; }
+
+        /* ── OUTREACH ACTION BANNER ──────────────────────────────────── */
+        .action-header-bar {
+            display: flex; align-items: center; gap: 14px;
+            padding: 16px 20px; background: #0a1a0a;
+            border: 1px solid #1a3a1a; border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .action-header-name { font-family: var(--serif); font-size: 17px; font-weight: 700; color: #6fcf97; }
+        .action-header-status { font-size: 12px; color: var(--mid); margin-left: auto; }
+    </style>
+</head>
+<body>
+
+<!-- ── LOGIN ───────────────────────────────────────────────────────── -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">Fuelvia</div>
+        <div class="login-tagline">Lead Generation</div>
+        <div class="form-group" style="text-align:left; margin-bottom:0;">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="Enter dashboard password"
+                   onkeydown="if(event.key==='Enter') handleLogin()">
+        </div>
+        <button class="btn btn-primary mt-20" onclick="handleLogin()" style="width:100%;justify-content:center;">
+            Sign In
+        </button>
+        <div class="login-foot">Fuelvia — Video Editing Agency</div>
+    </div>
+</div>
+
+<!-- ── DASHBOARD ───────────────────────────────────────────────────── -->
+<div id="dashboard" class="hidden">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-wordmark">Fuelvia</div>
+            <div class="logo-sub">Lead Generation</div>
+        </div>
+
+        <!-- PLATFORM nav -->
+        <div class="nav-section">
+            <div class="nav-label">Platform</div>
+            <div class="nav-item active" onclick="switchTab('overview', this)">
+                <span class="nav-icon">◈</span> Overview
+            </div>
+            <div class="nav-item" onclick="switchTab('leads', this)">
+                <span class="nav-icon">◉</span> All Leads
+            </div>
+            <div class="nav-item" onclick="switchTab('emails', this)">
+                <span class="nav-icon">◻</span> Emails
+            </div>
+            <div class="nav-item" onclick="switchTab('replies', this)">
+                <span class="nav-icon">◁</span> Replies
+            </div>
+        </div>
+
+        <!-- CAMPAIGN action buttons -->
+        <div class="nav-section">
+            <div class="nav-label">Campaign</div>
+
+            <button class="campaign-btn" id="sbtn-send-emails" onclick="runSendEmails()">
+                <div class="campaign-btn-title">✉ Send Emails</div>
+                <div class="campaign-btn-desc">Cold outreach to all New leads</div>
+            </button>
+
+            <button class="campaign-btn" id="sbtn-send-followup" onclick="runSendFollowup()">
+                <div class="campaign-btn-title">↩ Send Follow-ups</div>
+                <div class="campaign-btn-desc">Reminder to Contacted leads</div>
+            </button>
+
+            <button class="campaign-btn" id="sbtn-check-replies" onclick="runCheckReplies()">
+                <div class="campaign-btn-title">↺ Check Replies</div>
+                <div class="campaign-btn-desc">Scan all 3 email accounts</div>
+            </button>
+        </div>
+
+        <!-- TOOLS nav -->
+        <div class="nav-section">
+            <div class="nav-label">Tools</div>
+            <div class="nav-item" onclick="switchTab('intelligence', this)">
+                <span class="nav-icon">◆</span> Intelligence
+            </div>
+            <div class="nav-item" onclick="switchTab('scraper', this)">
+                <span class="nav-icon">▷</span> Scraper
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn-logout" onclick="handleLogout()">← Logout</button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="topbar">
+            <div class="page-title" id="page-title">Overview</div>
+            <div class="topbar-time" id="current-time"></div>
+        </div>
+
+        <div class="content">
+
+            <!-- OVERVIEW TAB -->
+            <div id="tab-overview" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Leads</div>
+                        <div class="stat-value" id="stat-leads">0</div>
+                        <div class="stat-sub">In Notion CRM</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Emails Sent</div>
+                        <div class="stat-value" id="stat-emails">0</div>
+                        <div class="stat-sub">Across 3 accounts</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Replies</div>
+                        <div class="stat-value" id="stat-replies">0</div>
+                        <div class="stat-sub">Positive responses</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Pipeline Breakdown</div>
+                    <div class="mini-grid">
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">New</div>
+                            <div class="mini-stat-value" id="stat-new-leads">0</div>
+                            <div class="mini-stat-sub">Ready to contact</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Contacted</div>
+                            <div class="mini-stat-value" id="stat-contacted">0</div>
+                            <div class="mini-stat-sub">Awaiting follow-up</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Follow-up Sent</div>
+                            <div class="mini-stat-value" id="stat-followup">0</div>
+                            <div class="mini-stat-sub">2-email limit reached</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Replied</div>
+                            <div class="mini-stat-value" id="stat-replied-detail">0</div>
+                            <div class="mini-stat-sub">Hot leads</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Closed</div>
+                            <div class="mini-stat-value" id="stat-closed">0</div>
+                            <div class="mini-stat-sub">No response</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OUTREACH / LIVE ACTIVITY TAB -->
+            <div id="tab-outreach" class="tab-content hidden">
+
+                <div class="action-header-bar">
+                    <div>
+                        <div class="action-header-name" id="action-title">Campaign Running</div>
+                        <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="action-subtitle">Starting…</div>
+                    </div>
+                    <button class="btn btn-danger hidden" id="btn-stop-action" onclick="stopEmailAction()" style="margin-left:auto;">⏹ Stop</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-title" style="padding-bottom:14px;margin-bottom:16px;">
+                        Live Activity
+                        <span id="action-status-wrap" style="margin-left:auto;">
+                            <span class="status-badge">
+                                <span class="status-dot idle" id="action-status-dot"></span>
+                                <span id="action-status-text">Idle</span>
+                            </span>
+                        </span>
+                    </div>
+
+                    <div class="progress-container" style="margin-top:0;">
+                        <div class="progress-header">
+                            <span id="action-progress-label" style="font-size:12px;color:var(--mid);">Waiting…</span>
+                            <span id="action-progress-text" style="font-size:12px;font-weight:600;"></span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="action-progress-fill" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:20px;">
+                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mid);margin-bottom:10px;">
+                            Live Log
+                        </div>
+                        <div class="logs-box" id="action-logs">
+                            <div class="log-entry">Waiting for action…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEADS TAB -->
+            <div id="tab-leads" class="tab-content hidden">
+                <div class="card" style="overflow-x:auto; padding-bottom:0;">
+                    <div class="card-title">
+                        All Leads
+                        <span id="leads-count" style="font-size:13px;color:var(--mid);font-weight:400;font-family:var(--body);"></span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                    <table style="min-width:1400px;">
+                        <thead>
+                            <tr>
+                                <th style="min-width:180px;">Channel</th>
+                                <th style="min-width:190px;">Email</th>
+                                <th style="min-width:80px;">Subs</th>
+                                <th style="min-width:110px;">Niche</th>
+                                <th style="min-width:100px;">Location</th>
+                                <th style="min-width:60px;">Score</th>
+                                <th style="min-width:130px;">Status</th>
+                                <th style="min-width:70px;">Replied</th>
+                                <th style="min-width:160px;">Sent From</th>
+                                <th style="min-width:100px;">Added</th>
+                                <th style="min-width:100px;">Last Contact</th>
+                                <th style="min-width:100px;">Reply Date</th>
+                                <th style="min-width:200px;">Reply Msg</th>
+                                <th style="min-width:200px;">Notes</th>
+                                <th style="min-width:60px;">Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-tbody">
+                            <tr><td colspan="15" class="text-center text-mid" style="padding:40px;">Loading leads…</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EMAILS TAB -->
+            <div id="tab-emails" class="tab-content hidden">
+                <div class="card">
+                    <div class="card-title">Emails Sent</div>
+                    <p style="font-size:12px;color:var(--mid);margin-bottom:16px;">All outreach emails — click any row to see details.</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Channel</th>
+                                <th>Sent From Account</th>
+                                <th>To (Lead Email)</th>
+                                <th>Date Sent</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="emails-tbody">
+                            <tr><td colspan="6" class="text-center text-mid" style="padding:30px;">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- REPLIES TAB -->
+            <div id="tab-replies" class="tab-content hidden">
+                <div class="card">
+                    <div class="card-title">Replies Received</div>
+                    <p style="font-size:12px;color:var(--mid);margin-bottom:16px;">
+                        Click any message preview to read the full reply. Use <strong>↺ Check Replies</strong> in the sidebar to scan for new ones.
+                    </p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Channel</th>
+                                <th>Lead Email</th>
+                                <th>Sent Via Account</th>
+                                <th>Status</th>
+                                <th>Reply Date</th>
+                                <th>Message Preview <span style="font-weight:400;opacity:0.6;">(click to expand)</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="replies-tbody">
+                            <tr><td colspan="6" class="text-center text-mid" style="padding:30px;">Loading replies…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- INTELLIGENCE TAB -->
+            <div id="tab-intelligence" class="tab-content hidden">
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-label">Niches</div><div class="stat-value">23</div><div class="stat-sub">Available categories</div></div>
+                    <div class="stat-card"><div class="stat-label">Locations</div><div class="stat-value">16</div><div class="stat-sub">Geographic reach</div></div>
+                    <div class="stat-card"><div class="stat-label">Sub Ranges</div><div class="stat-value">13</div><div class="stat-sub">Target options</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Niche Health</div>
+                    <div id="niche-health-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:28px;">
+                        <p class="text-mid">Loading…</p>
+                    </div>
+                    <div style="border-top:1px solid var(--offwhite);padding-top:24px;">
+                        <div style="font-family:var(--serif);font-size:16px;font-weight:700;margin-bottom:12px;">Expansion Recommendations</div>
+                        <div id="suggestions-container" class="text-mid" style="font-size:13px;line-height:1.8;">Loading recommendations…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCRAPER TAB -->
+            <div id="tab-scraper" class="tab-content hidden">
+                <div class="info-box">
+                    <strong>2-Email Policy:</strong> Cold email (Day 0) → Follow-up (Day 2) → Done. Scraper saves leads as "New" — then use <strong>Campaign</strong> buttons in the sidebar to email them.
+                </div>
+                <div class="card">
+                    <div class="card-title">YouTube Lead Scraper</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Niche</label><select id="scraper-niche"><option>Loading…</option></select></div>
+                        <div class="form-group"><label>Location</label><select id="scraper-location"><option>Loading…</option></select></div>
+                        <div class="form-group"><label>Subscriber Range</label><select id="scraper-sub-range"><option>Loading…</option></select></div>
+                        <div class="form-group"><label>Target Leads <span style="color: #7a5c00; font-size: 11px;">(Max 30)</span></label><input type="number" id="scraper-count" value="25" min="1" max="30"></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="btn-start" onclick="startScrape()">▷ Start Scraping</button>
+                        <button class="btn btn-warning hidden" id="btn-pause" onclick="pauseScrape()">⏸ Pause</button>
+                        <button class="btn btn-danger hidden" id="btn-stop" onclick="stopScrape()">⏹ Stop</button>
+                    </div>
+                    <div class="progress-container mt-24">
+                        <div class="progress-header">
+                            <span class="status-badge">
+                                <span class="status-dot idle" id="status-dot"></span>
+                                <span id="status-text">Ready</span>
+                            </span>
+                            <span id="progress-text" style="font-size:12px;">0 / 0</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-24">
+                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mid);margin-bottom:12px;">Live Activity Log</div>
+                        <div class="logs-box" id="scraper-logs">
+                            <div class="log-entry">Waiting to start…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </div><!-- /main -->
+</div><!-- /dashboard -->
+
+<!-- ── DETAIL MODAL ──────────────────────────────────────────────── -->
+<div id="detail-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title" id="modal-title">Detail</div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-meta" id="modal-meta"></div>
+        <div class="modal-body">
+            <div class="modal-body-label" id="modal-body-label">Message</div>
+            <div class="modal-message" id="modal-message"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Clock ─────────────────────────────────────────────────────────────
+setInterval(() => {
+    document.getElementById('current-time').textContent =
+        new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}, 1000);
+
+// ── Login ─────────────────────────────────────────────────────────────
+function handleLogin() {
+    const pw = document.getElementById('login-password').value;
+    if (!pw) return;
+    fetch('/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            loadDashboard();
+            startPolling();
+        } else { alert('Wrong password'); }
+    });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────
+function switchTab(name, el) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.remove('hidden');
+    if (el) el.classList.add('active');
+    const titles = {
+        overview:'Overview', leads:'All Leads', emails:'Emails Sent',
+        replies:'Replies', intelligence:'Intelligence', scraper:'Scraper',
+        outreach:'Campaign Activity'
+    };
+    document.getElementById('page-title').textContent = titles[name] || 'Dashboard';
+    if (name === 'leads')        loadLeads();
+    if (name === 'emails')       loadEmails();
+    if (name === 'replies')      loadReplies();
+    if (name === 'intelligence') loadIntelligence();
+    if (name === 'scraper')      loadScraperOptions();
+}
+
+// ── Dashboard data ────────────────────────────────────────────────────
+function loadDashboard() {
+    fetch('/api/dashboard-data').then(r => r.json()).then(d => {
+        if (d.error) return;
+        const s = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v || 0; };
+        s('stat-leads',          d.leads_total);
+        s('stat-emails',         d.emails_sent);
+        s('stat-replies',        d.replies_received);
+        s('stat-new-leads',      d.new_leads);
+        s('stat-contacted',      d.contacted);
+        s('stat-followup',       d.followup_sent);
+        s('stat-replied-detail', d.replies_received);
+        s('stat-closed',         d.closed);
+    }).catch(() => {});
+}
+
+// ── Leads ─────────────────────────────────────────────────────────────
+function loadLeads() {
+    fetch('/api/leads', { credentials: 'same-origin' })
+    .then(r => r.status === 401 ? null : r.json())
+    .then(data => {
+        const tbody = document.getElementById('leads-tbody');
+        if (!data) { tbody.innerHTML = '<tr><td colspan="15" class="text-center text-mid" style="padding:30px;">Session expired — please log in again</td></tr>'; return; }
+        if (data.error) { tbody.innerHTML = `<tr><td colspan="15" class="text-center" style="padding:30px;color:#7b2d2d;">Error: ${data.error}</td></tr>`; return; }
+        if (!data.leads || !data.leads.length) { tbody.innerHTML = '<tr><td colspan="15" class="text-center text-mid" style="padding:40px;">No leads yet — run the Scraper to add leads</td></tr>'; return; }
+        const countEl = document.getElementById('leads-count');
+        if (countEl) countEl.textContent = `— ${data.total} total`;
+        tbody.innerHTML = data.leads.map(l => {
+            const slug = (l.status||'new').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+            const yt   = l.youtube_url ? `<a href="${l.youtube_url}" target="_blank" style="color:var(--charcoal);text-decoration:underline;">▶</a>` : '—';
+            const rep  = l.replied ? '<span style="color:#1a5c3a;font-weight:700;">Yes</span>' : '<span style="color:var(--light);">No</span>';
+            return `<tr>
+                <td><strong>${l.channel_name||'—'}</strong></td>
+                <td style="font-size:12px;">${l.email||'—'}</td>
+                <td>${(l.subscriber_count||0).toLocaleString()}</td>
+                <td style="font-size:12px;">${l.niche||'—'}</td>
+                <td style="font-size:12px;">${l.location||'—'}</td>
+                <td style="text-align:center;font-weight:700;">${l.score||0}</td>
+                <td><span class="badge badge-${slug}">${l.status||'New'}</span></td>
+                <td style="text-align:center;">${rep}</td>
+                <td style="font-size:11px;color:var(--mid);">${l.email_sent_from||'—'}</td>
+                <td style="font-size:12px;">${(l.date_added||'').split('T')[0]||'—'}</td>
+                <td style="font-size:12px;">${(l.last_contact||'').split('T')[0]||'—'}</td>
+                <td style="font-size:12px;">${(l.reply_date||'').split('T')[0]||'—'}</td>
+                <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(l.reply_message||'').replace(/"/g,'&quot;')}">${l.reply_message||'—'}</td>
+                <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(l.notes||'').replace(/"/g,'&quot;')}">${l.notes||'—'}</td>
+                <td>${yt}</td>
+            </tr>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('leads-tbody').innerHTML = '<tr><td colspan="15" class="text-center text-mid" style="padding:30px;">Failed to load — refresh the page</td></tr>';
+    });
+}
+
+// ── Emails ────────────────────────────────────────────────────────────
+function loadEmails() {
+    fetch('/api/emails').then(r => r.json()).then(d => {
+        const tbody = document.getElementById('emails-tbody');
+        if (!d.emails || !d.emails.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-mid" style="padding:30px;">No emails sent yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.emails.map(e => {
+            const typeClass  = e.email_type === 'Follow-up' ? 'badge-follow-up-sent' : 'badge-contacted';
+            const dateStr    = e.sent_at ? new Date(e.sent_at).toLocaleDateString('en-GB') : '—';
+            const statusSlug = (e.status||'new').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+            return `<tr style="cursor:pointer;" onclick="showEmailDetail(${JSON.stringify(e).replace(/"/g,'&quot;')})">
+                <td><strong>${e.channel_name||'—'}</strong></td>
+                <td style="font-size:12px;color:var(--mid);">${e.from_account||'—'}</td>
+                <td style="font-size:12px;">${e.lead_email||'—'}</td>
+                <td style="font-size:12px;">${dateStr}</td>
+                <td><span class="badge ${typeClass}">${e.email_type||'Cold'}</span></td>
+                <td><span class="badge badge-${statusSlug}">${e.status||'Contacted'}</span></td>
+            </tr>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('emails-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-mid" style="padding:30px;">Failed to load — refresh page</td></tr>';
+    });
+}
+
+// ── Replies ───────────────────────────────────────────────────────────
+function loadReplies() {
+    fetch('/api/replies').then(r => r.json()).then(d => {
+        const tbody = document.getElementById('replies-tbody');
+        if (!d.replies || !d.replies.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-mid" style="padding:30px;">No replies yet — use ↺ Check Replies in the sidebar to scan</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.replies.map(r => {
+            const preview = (r.message||r.reply_message||'').substring(0,80);
+            const dateStr = r.reply_time ? new Date(r.reply_time).toLocaleDateString('en-GB') : '—';
+            return `<tr>
+                <td><strong>${r.channel_name||'Unknown'}</strong></td>
+                <td style="font-size:12px;">${r.email||'N/A'}</td>
+                <td style="font-size:11px;color:var(--mid);">${r.sent_from_account||'—'}</td>
+                <td><span class="badge badge-replied">Replied</span></td>
+                <td style="font-size:12px;">${dateStr}</td>
+                <td style="font-size:12px;color:var(--mid);cursor:pointer;max-width:300px;"
+                    onclick="showReplyBody(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+                    ${preview}… <span style="color:var(--black);font-weight:600;text-decoration:underline;">Read full ↗</span>
+                </td>
+            </tr>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('replies-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-mid" style="padding:30px;">Failed to load — refresh page</td></tr>';
+    });
+}
+
+// ── Intelligence ──────────────────────────────────────────────────────
+function loadIntelligence() {
+    fetch('/api/niche-health').then(r => r.json()).then(d => {
+        const c = document.getElementById('niche-health-container');
+        if (!d || !Object.keys(d).length) { c.innerHTML = '<p class="text-mid">No data yet</p>'; return; }
+        c.innerHTML = Object.entries(d).map(([n, s]) => `
+            <div class="niche-card">
+                <div class="niche-card-name">${n}</div>
+                <div class="niche-card-stats">Total: ${s.total} · Used: ${s.percentage_used}% · Remaining: <strong>${s.remaining}</strong></div>
+                <div class="niche-card-health">${s.health}</div>
+            </div>`).join('');
+    });
+    fetch('/api/expansion-suggestions').then(r => r.json()).then(d => {
+        const c = document.getElementById('suggestions-container');
+        let h = `<p style="font-weight:600;color:var(--charcoal);margin-bottom:10px;">${d.urgency||''}</p>`;
+        if (d.niche_suggestions) h += '<ul style="margin-left:18px;">' + d.niche_suggestions.map(s => `<li style="margin-bottom:5px;">${s}</li>`).join('') + '</ul>';
+        c.innerHTML = h;
+    });
+}
+
+// ── Scraper ───────────────────────────────────────────────────────────
+function loadScraperOptions() {
+    fetch('/api/niche-options').then(r => r.json()).then(d => {
+        document.getElementById('scraper-niche').innerHTML = d.options.map(o => `<option>${o}</option>`).join('');
+    });
+    fetch('/api/location-options').then(r => r.json()).then(d => {
+        document.getElementById('scraper-location').innerHTML = d.options.map(o => `<option>${o}</option>`).join('');
+    });
+    fetch('/api/subscriber-range-options').then(r => r.json()).then(d => {
+        document.getElementById('scraper-sub-range').innerHTML = d.options.map(o => `<option>${o}</option>`).join('');
+    });
+}
+
+function startScrape() {
+    const niche = document.getElementById('scraper-niche').value;
+    const location = document.getElementById('scraper-location').value;
+    const sub_range = document.getElementById('scraper-sub-range').value;
+    const max_leads = parseInt(document.getElementById('scraper-count').value);
+
+    // ── RULE 1: Hard limit validation ──
+    if (max_leads > 30) {
+        alert('Maximum 30 leads per search. Please enter 30 or less.');
+        return;
+    }
+    if (max_leads < 1) {
+        alert('Please enter at least 1 lead to search for.');
+        return;
+    }
+
+    document.getElementById('btn-start').classList.add('hidden');
+    document.getElementById('btn-pause').classList.remove('hidden');
+    document.getElementById('btn-stop').classList.remove('hidden');
+    document.getElementById('btn-pause').textContent = '⏸ Pause';
+    fetch('/api/start-scrape', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niche, location, sub_range, max_leads })
+    }).then(r => r.json()).then(d => {
+        if (!d.success) {
+            alert('Failed to start: ' + (d.error||'Unknown error'));
+            document.getElementById('btn-start').classList.remove('hidden');
+            document.getElementById('btn-pause').classList.add('hidden');
+            document.getElementById('btn-stop').classList.add('hidden');
+        }
+    });
+    updateScraperStatus();
+}
+
+function pauseScrape() {
+    const btn = document.getElementById('btn-pause');
+    const paused = btn.textContent.trim() === 'Resume';
+    fetch(paused ? '/api/resume-scrape' : '/api/pause-scrape', { method:'POST', credentials:'same-origin' })
+    .then(r => r.json()).then(d => { if (d.success) btn.textContent = paused ? '⏸ Pause' : 'Resume'; });
+}
+
+function stopScrape() {
+    fetch('/api/stop-scrape', { method:'POST', credentials:'same-origin' }).then(() => {
+        document.getElementById('btn-start').classList.remove('hidden');
+        document.getElementById('btn-pause').classList.add('hidden');
+        document.getElementById('btn-stop').classList.add('hidden');
+        document.getElementById('btn-pause').textContent = '⏸ Pause';
+    });
+}
+
+function updateScraperStatus() {
+    fetch('/api/scrape-status', { credentials:'same-origin' })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => {
+        const status = d.status || 'idle';
+        document.getElementById('progress-fill').style.width = d.progress + '%';
+        document.getElementById('progress-text').textContent = `${d.leads_found||0} / ${d.total||0}`;
+        const dot = document.getElementById('status-dot');
+        dot.className = 'status-dot ' + status;
+        document.getElementById('status-text').textContent = status.toUpperCase();
+        const active = status === 'running' || status === 'paused';
+        document.getElementById('btn-start').classList.toggle('hidden', active);
+        document.getElementById('btn-pause').classList.toggle('hidden', !active);
+        document.getElementById('btn-stop').classList.toggle('hidden', !active);
+        if (status === 'paused')  document.getElementById('btn-pause').textContent = 'Resume';
+        if (status === 'running') document.getElementById('btn-pause').textContent = '⏸ Pause';
+        const logs = document.getElementById('scraper-logs');
+        if (d.logs && d.logs.length) {
+            logs.innerHTML = d.logs.map(log => {
+                const cls = log.includes('✅')||log.includes('QUALIFIED') ? 'log-ok' :
+                            log.includes('❌')||log.includes('STOPPED') ? 'log-err' :
+                            log.includes('⚠')||log.includes('limit') ? 'log-warn' :
+                            log.includes('🏁') ? 'log-done' : '';
+                return `<div class="log-entry ${cls}">${log}</div>`;
+            }).join('');
+            logs.scrollTop = logs.scrollHeight;
+        }
+    }).catch(() => {});
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CAMPAIGN ACTIONS — sidebar buttons
+// ══════════════════════════════════════════════════════════════════════
+
+function _setSidebarBtnActive(id) {
+    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+        const el = document.getElementById(b);
+        if (el) el.classList.remove('active-action');
+    });
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active-action');
+}
+
+function _openOutreachTab(actionLabel) {
+    // Switch to outreach tab (no nav-item to mark active)
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-outreach').classList.remove('hidden');
+    document.getElementById('page-title').textContent = 'Campaign Activity';
+    document.getElementById('action-title').textContent = actionLabel;
+    document.getElementById('action-subtitle').textContent = 'Starting…';
+    document.getElementById('action-logs').innerHTML = '<div class="log-entry">Starting…</div>';
+    document.getElementById('action-progress-fill').style.width = '0%';
+    document.getElementById('action-progress-text').textContent = '';
+    document.getElementById('action-progress-label').textContent = 'Initialising…';
+    document.getElementById('action-status-dot').className = 'status-dot running';
+    document.getElementById('action-status-text').textContent = 'RUNNING';
+    document.getElementById('btn-stop-action').classList.remove('hidden');
+}
+
+function runSendEmails() {
+    if (!confirm('Send cold emails to all "New" leads?\n\nClaude will re-fetch YouTube data and write personalised emails. You can watch progress live.')) return;
+    fetch('/api/send-emails', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _setSidebarBtnActive('sbtn-send-emails');
+        _openOutreachTab('Send Emails to New Leads');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
+function runSendFollowup() {
+    if (!confirm('Send follow-ups to all "Contacted" leads?\n\nEach follow-up will reference the original email Claude wrote. Progress shown live.')) return;
+    fetch('/api/send-followup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _setSidebarBtnActive('sbtn-send-followup');
+        _openOutreachTab('Send Follow-ups');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
+function runCheckReplies() {
+    fetch('/api/check-replies', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _setSidebarBtnActive('sbtn-check-replies');
+        _openOutreachTab('Check Replies — Scanning Inboxes');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
+function stopEmailAction() {
+    fetch('/api/stop-email-action', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (!d.success) alert('Could not stop action');
+        document.getElementById('btn-stop-action').classList.add('hidden');
+    });
+}
+
+// ── Outreach tab live polling ─────────────────────────────────────────
+function updateOutreachStatus() {
+    fetch('/api/email-action-status')
+    .then(r => r.json())
+    .then(d => {
+        const status = d.status || 'idle';
+        const pct    = d.progress || 0;
+
+        // Status dot + text
+        document.getElementById('action-status-dot').className = 'status-dot ' + status;
+        document.getElementById('action-status-text').textContent = status.toUpperCase();
+
+        // Progress bar
+        document.getElementById('action-progress-fill').style.width = pct + '%';
+        if (d.total > 0) {
+            const done = Math.round(pct / 100 * d.total);
+            document.getElementById('action-progress-text').textContent = `${done} / ${d.total}`;
+        }
+
+        // Subtitle
+        const subtitleMap = {
+            send_emails:    'Cold emailing New leads',
+            send_followup:  'Following up Contacted leads',
+            check_replies:  'Scanning email inboxes',
+        };
+        if (d.action) {
+            document.getElementById('action-subtitle').textContent =
+                subtitleMap[d.action] || d.action;
+        }
+
+        // Progress label
+        const labelMap = { running:'In progress…', completed:'All done!', stopped:'Stopped.', error:'Encountered an error.', idle:'Waiting…' };
+        document.getElementById('action-progress-label').textContent = labelMap[status] || status;
+
+        // Stop button
+        document.getElementById('btn-stop-action').classList.toggle('hidden', status !== 'running');
+
+        // Log box
+        if (d.logs && d.logs.length) {
+            const logsEl = document.getElementById('action-logs');
+            logsEl.innerHTML = d.logs.map(line => {
+                const cls = line.includes('✅') || line.includes('🏁') ? 'log-ok' :
+                            line.includes('❌') ? 'log-err' :
+                            line.includes('⚠')  ? 'log-warn' :
+                            line.includes('🏁') ? 'log-done' : '';
+                return `<div class="log-entry ${cls}">${line}</div>`;
+            }).join('');
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        // Refresh dashboard when action completes
+        if (status === 'completed' || status === 'stopped') {
+            loadDashboard();
+            // Remove active highlight from sidebar button
+            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+                const el = document.getElementById(b);
+                if (el) el.classList.remove('active-action');
+            });
+        }
+    }).catch(() => {});
+}
+
+// ── Polling loops ─────────────────────────────────────────────────────
+function startPolling() {
+    setInterval(loadDashboard, 15000);
+
+    // Scraper polling — only when scraper tab is visible
+    setInterval(() => {
+        const active = document.querySelector('.tab-content:not(.hidden)');
+        if (active?.id === 'tab-scraper') updateScraperStatus();
+    }, 3000);
+
+    // Outreach polling — every 2s when outreach tab is visible OR action is running
+    setInterval(() => {
+        const active = document.querySelector('.tab-content:not(.hidden)');
+        if (active?.id === 'tab-outreach') updateOutreachStatus();
+    }, 2000);
+}
+
+// ── Logout ────────────────────────────────────────────────────────────
+function handleLogout() {
+    fetch('/api/logout', { method:'POST' }).then(() => {
+        document.getElementById('dashboard').classList.add('hidden');
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('login-password').value = '';
+    });
+}
+
+// ── Modals ────────────────────────────────────────────────────────────
+function openModal()  { document.getElementById('detail-modal').classList.add('open'); }
+function closeModal() { document.getElementById('detail-modal').classList.remove('open'); }
+document.getElementById('detail-modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function showEmailDetail(e) {
+    const dateStr = e.sent_at ? new Date(e.sent_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+    document.getElementById('modal-title').textContent = e.channel_name || 'Email Detail';
+    document.getElementById('modal-meta').innerHTML = `
+        <div class="modal-meta-item"><span class="modal-meta-label">Sent From</span><span class="modal-meta-value">${e.from_account||'—'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">To (Lead)</span><span class="modal-meta-value">${e.lead_email||'—'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Date Sent</span><span class="modal-meta-value">${dateStr}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Type</span><span class="modal-meta-value">${e.email_type||'Cold'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Niche</span><span class="modal-meta-value">${e.niche||'—'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Status</span><span class="modal-meta-value">${e.status||'—'}</span></div>`;
+    document.getElementById('modal-body-label').textContent = 'Email Info';
+    document.getElementById('modal-message').textContent =
+        'Personalised cold email written by Claude AI for the ' + (e.niche||'selected') + ' niche.\n\n' +
+        'Channel: '   + (e.channel_name||'—') + '\n' +
+        'Lead Email: '+ (e.lead_email||'—')   + '\n' +
+        'Sent via: '  + (e.from_account||'—') + '\n' +
+        'Date: '      + dateStr;
+    openModal();
+}
+
+function showReplyBody(r) {
+    const dateStr = r.reply_time ? new Date(r.reply_time).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+    document.getElementById('modal-title').textContent = (r.channel_name||'Reply') + ' — Full Reply';
+    document.getElementById('modal-meta').innerHTML = `
+        <div class="modal-meta-item"><span class="modal-meta-label">From (Lead)</span><span class="modal-meta-value">${r.email||'—'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Received On Account</span><span class="modal-meta-value">${r.sent_from_account||'—'}</span></div>
+        <div class="modal-meta-item"><span class="modal-meta-label">Reply Date</span><span class="modal-meta-value">${dateStr}</span></div>`;
+    document.getElementById('modal-body-label').textContent = 'Full Reply Message';
+    document.getElementById('modal-message').textContent = r.message || r.reply_message || 'No message body stored.';
+    openModal();
+}
+</script>
+</body>
+</html>

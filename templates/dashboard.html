@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuelvia Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --secondary: #1e40af;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* HEADER */
+        header {
+            background: var(--dark);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: #ccc;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        /* NAV TABS */
+        .nav-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+            background: white;
+            padding: 0 20px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .nav-tab {
+            padding: 15px 25px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .nav-tab:hover {
+            color: var(--primary);
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* TAB CONTENT */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* CARDS */
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 20px;
+            color: var(--dark);
+        }
+
+        /* FORMS */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        select, input[type="number"], input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* BUTTONS */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* TABLE */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: var(--light);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            color: var(--dark);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover {
+            background: var(--light);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-new {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-contacted {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-replied {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        /* PROGRESS BAR */
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: var(--light);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        /* LOGS */
+        .logs-box {
+            background: var(--dark);
+            color: #0f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(15, 255, 0, 0.1);
+        }
+
+        .log-entry.success {
+            color: #0f0;
+        }
+
+        .log-entry.error {
+            color: #f00;
+        }
+
+        .log-entry.info {
+            color: #0ff;
+        }
+
+        /* PAGINATION */
+        .pagination {
+            display: flex;
+            gap: 5px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .pagination button.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* STATUS INDICATORS */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-dot.running {
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.idle {
+            background: #999;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* LOGIN SCREEN */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--dark);
+        }
+
+        .login-card .form-group {
+            margin-bottom: 20px;
+        }
+
+        .login-card .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header-stats {
+                flex-direction: column;
+                gap: 15px;
+                font-size: 12px;
+            }
+
+            .nav-tabs {
+                overflow-x: auto;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+
+        /* UTILITIES */
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-container">
+    <div class="login-card">
+        <h1>Fuelvia</h1>
+        <div class="form-group">
+            <label>Dashboard Password</label>
+            <input type="password" id="login-password" placeholder="Enter password">
+        </div>
+        <button class="btn btn-primary" onclick="handleLogin()">Login</button>
+        <p class="text-center mt-20" style="font-size: 12px; color: #999;">
+            For access, contact your administrator
+        </p>
+    </div>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div id="dashboard" class="hidden">
+    <!-- HEADER -->
+    <header>
+        <div class="container">
+            <h1>Fuelvia Lead Generation</h1>
+            <div class="header-stats">
+                <div class="stat">
+                    <div class="stat-value" id="stat-leads">0</div>
+                    <div class="stat-label">TOTAL LEADS</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-emails">0</div>
+                    <div class="stat-label">EMAILS SENT</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-replies">0</div>
+                    <div class="stat-label">REPLIES</div>
+                </div>
+                <button class="btn btn-danger" onclick="handleLogout()" style="margin-left: auto;">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- NAVIGATION TABS -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('leads')">📊 Leads</button>
+            <button class="nav-tab" onclick="switchTab('emails')">✉️ Emails Sent</button>
+            <button class="nav-tab" onclick="switchTab('replies')">💬 Replies</button>
+            <button class="nav-tab" onclick="switchTab('intelligence')">🧠 Intelligence</button>
+            <button class="nav-tab" onclick="switchTab('scraper')">🚀 Scraper</button>
+        </div>
+
+        <!-- TAB 1: LEADS -->
+        <div id="tab-leads" class="tab-content active">
+            <div class="card">
+                <h2>All Leads</h2>
+                <div class="form-row mb-20">
+                    <input type="text" id="lead-search" placeholder="Search by channel name or email..." onkeyup="filterLeads()">
+                    <select id="lead-status-filter" onchange="filterLeads()">
+                        <option value="">All Status</option>
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Replied">Replied</option>
+                    </select>
+                </div>
+
+                <table id="leads-table">
+                    <thead>
+                        <tr>
+                            <th>Channel Name</th>
+                            <th>Email</th>
+                            <th>Subscribers</th>
+                            <th>Status</th>
+                            <th>Date Added</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leads-tbody">
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="pagination" id="leads-pagination"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: EMAILS SENT -->
+        <div id="tab-emails" class="tab-content">
+            <div class="card">
+                <h2>Emails Sent</h2>
+                <p style="color: #666; margin-bottom: 20px;">Combined from all 3 outreach email accounts</p>
+
+                <table id="emails-table">
+                    <thead>
+                        <tr>
+                            <th>From</th>
+                            <th>To (Lead Email)</th>
+                            <th>Sent Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 3: REPLIES -->
+        <div id="tab-replies" class="tab-content">
+            <div class="card">
+                <h2>Replies Received</h2>
+                <p style="color: #666; margin-bottom: 20px;">Automated reply detection from Gmail accounts</p>
+
+                <table id="replies-table">
+                    <thead>
+                        <tr>
+                            <th>Lead Email</th>
+                            <th>Reply Message</th>
+                            <th>Reply Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 4: INTELLIGENCE -->
+        <div id="tab-intelligence" class="tab-content">
+            <div class="card">
+                <h2>🧠 Lead Intelligence & Expansion Strategy</h2>
+                <p style="color: #666; margin-bottom: 20px;">Niche health, lead availability, and growth recommendations</p>
+
+                <div style="margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 15px; color: var(--primary);">Niche Health Status</h3>
+                    <div id="niche-health-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                        <p class="text-center">Loading...</p>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 15px; color: var(--primary);">📈 Expansion Recommendations</h3>
+                    <div id="suggestions-container" style="background: #f0f4f8; padding: 20px; border-radius: 8px; border-left: 4px solid var(--primary);">
+                        <p class="text-center">Loading recommendations...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: SCRAPER -->
+        <div id="tab-scraper" class="tab-content">
+            <div class="card">
+                <h2>Lead Scraper</h2>
+                <p style="color: #666; margin-bottom: 20px;">Configure and run real-time YouTube scraping</p>
+
+                <div class="form-row mb-20">
+                    <div class="form-group">
+                        <label>Niche</label>
+                        <select id="scraper-niche">
+                            <option>Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <select id="scraper-location">
+                            <option>Loading...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row mb-20">
+                    <div class="form-group">
+                        <label>Subscriber Range</label>
+                        <select id="scraper-sub-range">
+                            <option>Loading...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>How Many Leads?</label>
+                        <input type="number" id="scraper-count" value="25" min="1" max="100">
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-success" id="btn-start" onclick="startScrape()">Start Scraping</button>
+                    <button class="btn btn-warning hidden" id="btn-pause" onclick="pauseScrape()">Pause</button>
+                    <button class="btn btn-danger hidden" id="btn-stop" onclick="stopScrape()">Stop</button>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div class="status">
+                            <div class="status-dot idle" id="status-dot"></div>
+                            <span id="status-text">Ready</span>
+                        </div>
+                        <span id="progress-text">0/0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+
+                <div>
+                    <p style="font-weight: 600; margin-bottom: 10px;">Live Activity Log:</p>
+                    <div class="logs-box" id="scraper-logs">
+                        <div class="log-entry info">Waiting to start...</div>
+                    </div>
+                </div>
+
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                    Note: Scraping will continue in the background even if you close this window or browser.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // AUTHENTICATION
+    // ============================================================
+
+    function handleLogin() {
+        const password = document.getElementById('login-password').value;
+        if (!password) {
+            alert('Please enter password');
+            return;
+        }
+
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                loadDashboard();
+                startPolling();
+            } else {
+                alert('Invalid password');
+            }
+        });
+    }
+
+    function handleLogout() {
+        fetch('/api/logout', { method: 'POST' })
+        .then(() => {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('login-password').value = '';
+        });
+    }
+
+    // ============================================================
+    // TAB SWITCHING
+    // ============================================================
+
+    function switchTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+
+        // Show selected tab
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        event.target.classList.add('active');
+
+        // Load tab data
+        if (tabName === 'leads') loadLeads(1);
+        if (tabName === 'emails') loadEmails();
+        if (tabName === 'replies') loadReplies();
+        if (tabName === 'intelligence') loadIntelligence();
+        if (tabName === 'scraper') loadScraperOptions();
+    }
+
+    // ============================================================
+    // DASHBOARD DATA
+    // ============================================================
+
+    function loadDashboard() {
+        fetch('/api/dashboard-data')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('stat-leads').textContent = data.leads_total || 0;
+            document.getElementById('stat-emails').textContent = data.emails_sent || 0;
+            document.getElementById('stat-replies').textContent = data.replies_received || 0;
+        });
+    }
+
+    function startPolling() {
+        setInterval(() => {
+            loadDashboard();
+            if (!document.getElementById('tab-scraper').classList.contains('active')) return;
+            updateScraperStatus();
+        }, 2000);
+    }
+
+    // ============================================================
+    // LEADS TAB
+    // ============================================================
+
+    function loadLeads(page = 1) {
+        fetch(`/api/leads?page=${page}`)
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('leads-tbody');
+            tbody.innerHTML = '';
+
+            if (data.leads.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No leads found</td></tr>';
+                return;
+            }
+
+            data.leads.forEach(lead => {
+                const row = `
+                    <tr>
+                        <td><strong>${lead.channel_name}</strong></td>
+                        <td>${lead.email}</td>
+                        <td>${(lead.subscriber_count || 0).toLocaleString()}</td>
+                        <td><span class="badge badge-${lead.status.toLowerCase()}">${lead.status}</span></td>
+                        <td>${new Date(lead.date_added).toLocaleDateString()}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            // Pagination
+            const pagination = document.getElementById('leads-pagination');
+            pagination.innerHTML = '';
+            const totalPages = Math.ceil(data.total / data.per_page);
+            for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = i === page ? 'active' : '';
+                btn.onclick = () => loadLeads(i);
+                pagination.appendChild(btn);
+            }
+        });
+    }
+
+    function filterLeads() {
+        // Implementation for filtering
+    }
+
+    // ============================================================
+    // EMAILS TAB
+    // ============================================================
+
+    function loadEmails() {
+        fetch('/api/emails')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#emails-table tbody');
+
+                if (!data.emails || data.emails.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center">No emails sent yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.emails.map(email => `
+                    <tr>
+                        <td><strong>${email.from_account}</strong></td>
+                        <td>${email.lead_email}</td>
+                        <td>${new Date(email.sent_at).toLocaleDateString()} ${new Date(email.sent_at).toLocaleTimeString()}</td>
+                        <td><span class="badge badge-success">${email.status || 'Sent'}</span></td>
+                    </tr>
+                `).join('');
+            })
+            .catch(e => {
+                console.error('Error loading emails:', e);
+                document.querySelector('#emails-table tbody').innerHTML = '<tr><td colspan="4" class="text-center error">Error loading emails</td></tr>';
+            });
+    }
+
+    // ============================================================
+    // REPLIES TAB
+    // ============================================================
+
+    function loadReplies() {
+        fetch('/api/replies')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#replies-table tbody');
+
+                if (!data.replies || data.replies.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center">No replies received yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.replies.map(reply => `
+                    <tr>
+                        <td><strong>${reply.lead_email}</strong><br><small>${reply.channel_name || 'Unknown'}</small></td>
+                        <td style="max-width: 300px; word-break: break-word;">${reply.reply_message.substring(0, 100)}...</td>
+                        <td>${new Date(reply.reply_at).toLocaleDateString()} ${new Date(reply.reply_at).toLocaleTimeString()}</td>
+                    </tr>
+                `).join('');
+            })
+            .catch(e => {
+                console.error('Error loading replies:', e);
+                document.querySelector('#replies-table tbody').innerHTML = '<tr><td colspan="3" class="text-center error">Error loading replies</td></tr>';
+            });
+    }
+
+    // ============================================================
+    // INTELLIGENCE TAB
+    // ============================================================
+
+    function loadIntelligence() {
+        // Load niche health
+        fetch('/api/niche-health')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('niche-health-container');
+                if (!data || Object.keys(data).length === 0) {
+                    container.innerHTML = '<p class="text-center">No niche data yet</p>';
+                    return;
+                }
+
+                container.innerHTML = Object.entries(data).map(([niche, stats]) => `
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">${niche}</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                            <div>Total: ${stats.total} leads</div>
+                            <div>Contacted: ${stats.contacted} (${stats.percentage_used}%)</div>
+                            <div>Remaining: <strong>${stats.remaining}</strong></div>
+                        </div>
+                        <div style="font-size: 14px; font-weight: 600;">${stats.health}</div>
+                    </div>
+                `).join('');
+            })
+            .catch(e => {
+                console.error('Error loading niche health:', e);
+                document.getElementById('niche-health-container').innerHTML = '<p style="color: red;">Error loading data</p>';
+            });
+
+        // Load expansion suggestions
+        fetch('/api/expansion-suggestions')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('suggestions-container');
+
+                let html = `<div style="margin-bottom: 20px;"><strong style="font-size: 16px; color: #ef4444;">${data.urgency}</strong></div>`;
+
+                if (data.niche_suggestions && data.niche_suggestions.length > 0) {
+                    html += '<div style="margin-bottom: 15px;"><strong>Niche Strategy:</strong><ul style="margin-left: 20px; margin-top: 10px;">';
+                    data.niche_suggestions.forEach(s => {
+                        html += `<li style="margin-bottom: 8px;">${s}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                if (data.location_suggestions && data.location_suggestions.length > 0) {
+                    html += '<div style="margin-bottom: 15px;"><strong>Location Strategy:</strong><ul style="margin-left: 20px; margin-top: 10px;">';
+                    data.location_suggestions.forEach(s => {
+                        html += `<li style="margin-bottom: 8px;">${s}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                if (data.subscriber_suggestions && data.subscriber_suggestions.length > 0) {
+                    html += '<div><strong>Subscriber Range Strategy:</strong><ul style="margin-left: 20px; margin-top: 10px;">';
+                    data.subscriber_suggestions.forEach(s => {
+                        html += `<li style="margin-bottom: 8px;">${s}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                container.innerHTML = html;
+            })
+            .catch(e => {
+                console.error('Error loading suggestions:', e);
+                document.getElementById('suggestions-container').innerHTML = '<p style="color: red;">Error loading suggestions</p>';
+            });
+    }
+
+    // ============================================================
+    // SCRAPER TAB
+    // ============================================================
+
+    function loadScraperOptions() {
+        // Load niche options
+        fetch('/api/niche-options')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('scraper-niche');
+            select.innerHTML = data.options.map(opt => `<option>${opt}</option>`).join('');
+        });
+
+        // Load location options
+        fetch('/api/location-options')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('scraper-location');
+            select.innerHTML = data.options.map(opt => `<option>${opt}</option>`).join('');
+        });
+
+        // Load subscriber range options
+        fetch('/api/subscriber-range-options')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('scraper-sub-range');
+            select.innerHTML = data.options.map(opt => `<option>${opt}</option>`).join('');
+        });
+    }
+
+    function startScrape() {
+        const niche = document.getElementById('scraper-niche').value;
+        const location = document.getElementById('scraper-location').value;
+        const sub_range = document.getElementById('scraper-sub-range').value;
+        const max_leads = document.getElementById('scraper-count').value;
+
+        fetch('/api/start-scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ niche, location, sub_range, max_leads })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('btn-start').classList.add('hidden');
+                document.getElementById('btn-pause').classList.remove('hidden');
+                document.getElementById('btn-stop').classList.remove('hidden');
+                updateScraperStatus();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+
+    function pauseScrape() {
+        fetch('/api/pause-scrape', { method: 'POST' })
+        .then(() => updateScraperStatus());
+    }
+
+    function stopScrape() {
+        fetch('/api/stop-scrape', { method: 'POST' })
+        .then(() => {
+            document.getElementById('btn-start').classList.remove('hidden');
+            document.getElementById('btn-pause').classList.add('hidden');
+            document.getElementById('btn-stop').classList.add('hidden');
+            updateScraperStatus();
+        });
+    }
+
+    function updateScraperStatus() {
+        fetch('/api/scrape-status')
+        .then(r => r.json())
+        .then(data => {
+            // Update progress
+            document.getElementById('progress-fill').style.width = data.progress + '%';
+            document.getElementById('progress-fill').textContent = data.progress + '%';
+            document.getElementById('progress-text').textContent = `${data.leads_found}/${data.total}`;
+
+            // Update status
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            statusDot.className = `status-dot ${data.status}`;
+            statusText.textContent = data.status.toUpperCase() + ` (${data.current_channel})`;
+
+            // Update logs
+            const logsBox = document.getElementById('scraper-logs');
+            logsBox.innerHTML = data.logs
+                .map(log => `<div class="log-entry">${log}</div>`)
+                .join('');
+            logsBox.scrollTop = logsBox.scrollHeight;
+        });
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    // Check if already logged in
+    fetch('/api/dashboard-data')
+    .then(r => {
+        if (r.ok) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            loadDashboard();
+            startPolling();
+        }
+    })
+    .catch(() => {
+        // Not logged in
+    });
+</script>
+
+</body>
+</html>

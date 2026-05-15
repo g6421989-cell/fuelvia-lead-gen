@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fuelvia — Lead Generator</title>
+  <style>
+    /* ── Reset & Variables ──────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar:      #0f1117;
+      --sidebar-2:    #1a1d2e;
+      --accent:       #7c6bff;
+      --accent-glow:  rgba(124,107,255,.15);
+      --success:      #10b981;
+      --warning:      #f59e0b;
+      --error:        #ef4444;
+      --info:         #3b82f6;
+      --progress:     #8b5cf6;
+      --bg:           #f1f5f9;
+      --card:         #ffffff;
+      --border:       #e2e8f0;
+      --text:         #0f172a;
+      --text-2:       #475569;
+      --text-3:       #94a3b8;
+      --radius:       12px;
+      --shadow:       0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md:    0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ────────────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--sidebar);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .sidebar-logo {
+      padding: 28px 24px 20px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+    .sidebar-logo span { color: var(--accent); }
+
+    .sidebar-section {
+      padding: 6px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #3d4466;
+      margin-top: 16px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      color: #5a6080;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      border-right: 3px solid transparent;
+      transition: all .15s;
+    }
+    .nav-item:hover { color: #9aa0c0; background: rgba(255,255,255,.04); }
+    .nav-item.active {
+      color: #fff;
+      background: rgba(124,107,255,.15);
+      border-right-color: var(--accent);
+    }
+    .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      padding: 20px 24px;
+      font-size: 11px;
+      color: #2d3050;
+    }
+
+    /* ── Main content ───────────────────────────────────── */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Quota bar ──────────────────────────────────────── */
+    .quota-bar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow);
+    }
+
+    .quota-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .quota-stats {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .quota-stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .quota-label {
+      font-size: 12px;
+      color: var(--text-3);
+      font-weight: 500;
+    }
+    .quota-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .quota-value.danger { color: var(--error); }
+    .quota-value.full   { color: var(--success); }
+
+    .quota-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .quota-bar-track {
+      width: 100px;
+      height: 6px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .quota-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: var(--accent);
+      transition: width .4s, background .3s;
+    }
+    .quota-bar-fill.danger { background: var(--error); }
+
+    .quota-reset {
+      font-size: 11px;
+      color: var(--text-3);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+    }
+
+    /* ── Page ───────────────────────────────────────────── */
+    .page {
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1100px;
+      width: 100%;
+    }
+
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+    .page-header p {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-top: 4px;
+    }
+
+    /* ── Card ───────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-header {
+      padding: 16px 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card-body { padding: 20px; }
+
+    /* ── Form ───────────────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .form-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .form-field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13.5px;
+      color: var(--text);
+      background: var(--bg);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 32px;
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* Fixed badge */
+    .leads-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 16px;
+      border-radius: 8px;
+      height: 42px;
+      margin-top: 22px;
+    }
+
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(124,107,255,.35);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #6958e8;
+      box-shadow: 0 4px 14px rgba(124,107,255,.5);
+      transform: translateY(-1px);
+    }
+    .btn-primary:disabled {
+      background: #c5c1f0;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .btn-primary.danger-btn:disabled {
+      background: #fca5a5;
+      color: #7f1d1d;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-3);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      padding: 7px 12px;
+    }
+    .btn-ghost:hover { background: var(--bg); color: var(--text-2); }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Limit tooltip */
+    .limit-tooltip {
+      display: none;
+      font-size: 12px;
+      color: var(--error);
+      font-weight: 500;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      padding: 6px 12px;
+    }
+
+    /* ── Activity Log ───────────────────────────────────── */
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .log-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .log-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #cbd5e1;
+    }
+    .log-live-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.2);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(16,185,129,.2); }
+      50%       { box-shadow: 0 0 0 6px rgba(16,185,129,.05); }
+    }
+
+    .log-body {
+      height: 420px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      background: #fafbfc;
+    }
+    .log-body::-webkit-scrollbar { width: 4px; }
+    .log-body::-webkit-scrollbar-track { background: transparent; }
+    .log-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .log-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--text-3);
+      font-size: 13px;
+    }
+    .log-empty svg { width: 32px; height: 32px; opacity: .4; }
+
+    /* Log entry */
+    .log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 16px;
+      border-left: 3px solid transparent;
+      border-bottom: 1px solid #f1f5f9;
+      background: var(--card);
+      animation: fadeIn .2s ease-out;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+
+    .log-entry.info     { border-left-color: var(--info); }
+    .log-entry.success  { border-left-color: var(--success); background: #f0fdf4; }
+    .log-entry.warning  { border-left-color: var(--warning); }
+    .log-entry.error    { border-left-color: var(--error);   background: #fff5f5; }
+    .log-entry.progress { border-left-color: var(--progress); background: #faf5ff; }
+
+    .log-ts {
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 10.5px;
+      color: var(--text-3);
+      min-width: 64px;
+      padding-top: 2px;
+      flex-shrink: 0;
+    }
+    .log-icon {
+      font-size: 13px;
+      width: 16px;
+      text-align: center;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+    .log-msg {
+      flex: 1;
+      font-size: 12.5px;
+      color: var(--text);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .log-entry.success .log-msg { color: #065f46; font-weight: 500; }
+    .log-entry.error   .log-msg { color: #991b1b; }
+    .log-entry.progress .log-msg { color: #5b21b6; font-weight: 600; }
+
+    /* ── Progress bar (inline in log) ──────────────────── */
+    .progress-bar-wrap {
+      margin-top: 4px;
+      height: 4px;
+      background: #ede9fe;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--progress);
+      border-radius: 99px;
+      transition: width .3s ease;
+    }
+
+    /* ── Results card ───────────────────────────────────── */
+    .results-card {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #a7f3d0;
+      border-radius: var(--radius);
+      padding: 24px;
+      display: none;
+    }
+    .results-card.show { display: flex; gap: 32px; align-items: center; }
+    .results-icon { font-size: 40px; }
+    .results-body { flex: 1; }
+    .results-body h3 { font-size: 16px; font-weight: 700; color: #064e3b; }
+    .results-body p { font-size: 13px; color: #065f46; margin-top: 4px; }
+    .results-stats {
+      display: flex;
+      gap: 24px;
+      margin-top: 12px;
+    }
+    .results-stat { text-align: center; }
+    .results-stat-val { font-size: 28px; font-weight: 800; color: #059669; }
+    .results-stat-lbl { font-size: 11px; color: #6ee7b7; font-weight: 600; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">Fuel<span>via</span></div>
+
+  <div class="sidebar-section">Outreach</div>
+
+  <a href="#" class="nav-item active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    Lead Generator
+  </a>
+  <a href="#" class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    Follow-ups
+  </a>
+
+  <div class="sidebar-section">System</div>
+
+  <a href="#" class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+    </svg>
+    Settings
+  </a>
+
+  <div class="sidebar-bottom">v3.0 · Fuelvia</div>
+</aside>
+
+<!-- ── Main ──────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Quota bar -->
+  <div class="quota-bar">
+    <div class="quota-title">Daily Usage</div>
+    <div class="quota-stats">
+      <div class="quota-stat">
+        <span class="quota-label">Searches</span>
+        <div class="quota-progress-wrap">
+          <div class="quota-bar-track">
+            <div class="quota-bar-fill" id="searchFill" style="width:0%"></div>
+          </div>
+          <span class="quota-value" id="searchCount">0/3</span>
+        </div>
+      </div>
+      <div class="quota-stat">
+        <span class="quota-label">Leads</span>
+        <div class="quota-progress-wrap">
+          <div class="quota-bar-track">
+            <div class="quota-bar-fill" id="leadFill" style="width:0%"></div>
+          </div>
+          <span class="quota-value" id="leadCount">0/90</span>
+        </div>
+      </div>
+      <div class="quota-reset" id="resetTime">Resets at midnight</div>
+    </div>
+  </div>
+
+  <!-- Page -->
+  <div class="page">
+    <div class="page-header">
+      <h1>Lead Generator</h1>
+      <p>Find YouTube creators, qualify by email + activity, send personalised outreach</p>
+    </div>
+
+    <!-- Search form card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Search Parameters</span>
+        <div class="leads-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          30 Leads Per Search · Fixed
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Niche</label>
+            <select id="niche">
+              {% for n in niche_options %}
+              <option value="{{ n }}">{{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Location</label>
+            <select id="location">
+              {% for l in location_options %}
+              <option value="{{ l }}">{{ l }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Subscriber Range</label>
+            <select id="subRange">
+              {% for r in sub_range_options %}
+              <option value="{{ r }}">{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" id="startBtn" onclick="startScrape()">
+            <div class="spinner" id="spinner"></div>
+            <svg id="startIcon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span id="startLabel">Start Scraping</span>
+          </button>
+          <div class="limit-tooltip" id="limitMsg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results card (shown after completion) -->
+    <div class="results-card" id="resultsCard">
+      <div class="results-icon">🎯</div>
+      <div class="results-body">
+        <h3 id="resultsHeadline">Search complete!</h3>
+        <p id="resultsSubline"></p>
+        <div class="results-stats">
+          <div class="results-stat">
+            <div class="results-stat-val" id="resLeads">0</div>
+            <div class="results-stat-lbl">Emails Sent</div>
+          </div>
+          <div class="results-stat">
+            <div class="results-stat-val" id="resScanned">0</div>
+            <div class="results-stat-lbl">Channels Scanned</div>
+          </div>
+          <div class="results-stat">
+            <div class="results-stat-val" id="resTime">0m</div>
+            <div class="results-stat-lbl">Time Taken</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity log card -->
+    <div class="card">
+      <div class="log-header">
+        <div class="log-title">
+          <div class="log-live-dot" id="liveDot"></div>
+          Activity Log
+        </div>
+        <button class="btn btn-ghost" onclick="clearLog()">Clear log</button>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-empty" id="logEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          No activity yet. Start a search above.
+        </div>
+      </div>
+    </div>
+  </div><!-- /page -->
+
+</main>
+
+<script>
+/* ── Icons ─────────────────────────────────────────── */
+const ICONS = {
+  info:     '🔵',
+  success:  '✅',
+  warning:  '⚠️',
+  error:    '❌',
+  progress: '📊',
+  complete: '🎉',
+};
+
+/* ── Quota ─────────────────────────────────────────── */
+async function loadQuota() {
+  try {
+    const r = await fetch('/api/quota');
+    const q = await r.json();
+    updateQuotaUI(q);
+  } catch(e) { /* silently ignore */ }
+}
+
+function updateQuotaUI(q) {
+  const su = q.searches_used, sm = q.searches_max;
+  const lu = q.leads_collected, lm = q.leads_max;
+
+  document.getElementById('searchCount').textContent = `${su}/${sm}`;
+  document.getElementById('leadCount').textContent   = `${lu}/${lm}`;
+  document.getElementById('resetTime').textContent   = `Resets in ${q.reset_in}`;
+
+  const sPct = (su / sm) * 100;
+  const lPct = (lu / lm) * 100;
+
+  const sf = document.getElementById('searchFill');
+  sf.style.width = sPct + '%';
+  sf.className = 'quota-bar-fill' + (su >= sm ? ' danger' : '');
+
+  const lf = document.getElementById('leadFill');
+  lf.style.width = lPct + '%';
+
+  const sc = document.getElementById('searchCount');
+  sc.className = 'quota-value' + (su >= sm ? ' danger' : su === 0 ? '' : '');
+
+  const startBtn = document.getElementById('startBtn');
+  const limitMsg = document.getElementById('limitMsg');
+
+  if (!q.can_search) {
+    startBtn.disabled = true;
+    startBtn.classList.add('danger-btn');
+    document.getElementById('startLabel').textContent = 'Daily limit reached';
+    limitMsg.style.display = 'inline-block';
+    limitMsg.textContent = `Limit reached — resets in ${q.reset_in}`;
+  }
+}
+
+/* ── Log helpers ───────────────────────────────────── */
+function clearLog() {
+  const body = document.getElementById('logBody');
+  body.innerHTML = `
+    <div class="log-empty" id="logEmpty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      No activity yet. Start a search above.
+    </div>`;
+}
+
+function addLog(type, message, time, extraData) {
+  const empty = document.getElementById('logEmpty');
+  if (empty) empty.remove();
+
+  const body = document.getElementById('logBody');
+  const div  = document.createElement('div');
+  div.className = `log-entry ${type}`;
+
+  let extra = '';
+  if (type === 'progress' && extraData) {
+    const pct = Math.round((extraData.found / extraData.target) * 100);
+    extra = `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
+  }
+
+  div.innerHTML = `
+    <span class="log-ts">${time || ''}</span>
+    <span class="log-icon">${ICONS[type] || 'ℹ️'}</span>
+    <span class="log-msg">${escHtml(message)}${extra}</span>`;
+
+  // Newest at top
+  body.insertBefore(div, body.firstChild);
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Scraping ──────────────────────────────────────── */
+let activeStream = null;
+
+async function startScrape() {
+  const startBtn   = document.getElementById('startBtn');
+  const spinner    = document.getElementById('spinner');
+  const startIcon  = document.getElementById('startIcon');
+  const startLabel = document.getElementById('startLabel');
+  const liveDot    = document.getElementById('liveDot');
+  const resultsCard = document.getElementById('resultsCard');
+
+  const niche    = document.getElementById('niche').value;
+  const location = document.getElementById('location').value;
+  const subRange = document.getElementById('subRange').value;
+
+  // Verify quota first
+  const qr = await fetch('/api/quota');
+  const q  = await qr.json();
+  if (!q.can_search) {
+    updateQuotaUI(q);
+    return;
+  }
+
+  // Hide results card from previous run
+  resultsCard.classList.remove('show');
+
+  // UI: scraping state
+  startBtn.disabled = true;
+  spinner.style.display = 'block';
+  startIcon.style.display = 'none';
+  startLabel.textContent = 'Scraping in progress…';
+  liveDot.classList.add('active');
+
+  // Clear old log
+  clearLog();
+
+  addLog('info',
+    `Starting: ${niche} | ${location} | ${subRange}`,
+    new Date().toTimeString().slice(0,8)
+  );
+
+  // POST → SSE stream
+  try {
+    const resp = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({niche, location, sub_range: subRange}),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      addLog('error', err.error || 'Server error', new Date().toTimeString().slice(0,8));
+      resetBtn();
+      return;
+    }
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop(); // keep incomplete chunk
+
+      for (const chunk of lines) {
+        const line = chunk.trim();
+        if (!line.startsWith('data:')) continue;
+
+        let evt;
+        try { evt = JSON.parse(line.slice(5).trim()); }
+        catch { continue; }
+
+        if (evt.type === 'stream_end') break;
+
+        addLog(evt.type, evt.message, evt.time, evt.data);
+
+        if (evt.type === 'complete' && evt.data) {
+          showResults(evt.data, niche, location);
+          await loadQuota();
+        }
+      }
+    }
+
+  } catch(e) {
+    addLog('error', `Connection error: ${e.message}`, new Date().toTimeString().slice(0,8));
+  }
+
+  resetBtn();
+}
+
+function resetBtn() {
+  const startBtn   = document.getElementById('startBtn');
+  const spinner    = document.getElementById('spinner');
+  const startIcon  = document.getElementById('startIcon');
+  const startLabel = document.getElementById('startLabel');
+  const liveDot    = document.getElementById('liveDot');
+
+  startBtn.disabled = false;
+  spinner.style.display = 'none';
+  startIcon.style.display = 'block';
+  startLabel.textContent = 'Start Scraping';
+  liveDot.classList.remove('active');
+}
+
+function showResults(data, niche, location) {
+  const card = document.getElementById('resultsCard');
+  const secs = data.time_seconds || 0;
+  const mins = Math.floor(secs / 60), s = secs % 60;
+
+  document.getElementById('resultsHeadline').textContent =
+    `Search #${data.leads_found > 0 ? 'complete' : 'done'} — ${niche}`;
+  document.getElementById('resultsSubline').textContent =
+    `${location} · ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}`;
+  document.getElementById('resLeads').textContent   = data.leads_found   || 0;
+  document.getElementById('resScanned').textContent = data.channels_scanned || 0;
+  document.getElementById('resTime').textContent    = `${mins}m ${s}s`;
+
+  card.classList.add('show');
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* ── Init ──────────────────────────────────────────── */
+loadQuota();
+setInterval(loadQuota, 60_000); // refresh every minute
+</script>
+
+</body>
+</html>

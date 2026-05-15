@@ -1,0 +1,32 @@
+{
+  "outreach_emails": [
+    {
+      "email": "jashan@fuelviaa.com",
+      "password": "Rooted@14",
+      "smtp_server": "smtp.hostinger.com",
+      "smtp_port": 587,
+      "use_tls": true
+    },
+    {
+      "email": "ruwaid@fuelviaa.com",
+      "password": "Rooted@14",
+      "smtp_server": "smtp.hostinger.com",
+      "smtp_port": 587,
+      "use_tls": true
+    },
+    {
+      "email": "danish@fuelviaa.com",
+      "password": "Rooted@14",
+      "smtp_server": "smtp.hostinger.com",
+      "smtp_port": 587,
+      "use_tls": true
+    }
+  ],
+  "reporting_email": {
+    "email": "jashan@fuelviaa.com",
+    "password": "Rooted@14",
+    "smtp_server": "smtp.hostinger.com",
+    "smtp_port": 587,
+    "use_tls": true
+  }
+}

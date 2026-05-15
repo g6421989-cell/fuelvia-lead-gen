@@ -1,0 +1,12 @@
+  [OK] 8 YouTube API key(s) loaded - rotation enabled
+
+============================================================
+FUELVIA DASHBOARD STARTING
+============================================================
+Access: http://localhost:5000
+Password: fuelvia2025
+Emails config: email_config.json
+============================================================
+
+ * Serving Flask app 'app'
+ * Debug mode: on

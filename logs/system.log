@@ -1,0 +1,230 @@
+2026-05-11 23:08:34 - INFO - [SUCCESS] Backup database initialized
+2026-05-11 23:08:34 - INFO - [SUCCESS] Test message from test script
+2026-05-11 23:08:54 - INFO - [SUCCESS] Backup database initialized
+2026-05-11 23:31:50 - INFO - [SUCCESS] Backup database initialized
+2026-05-11 23:31:50 - INFO - [SUCCESS] Compliance database initialized
+2026-05-11 23:33:24 - INFO - [SUCCESS] Backup database initialized
+2026-05-11 23:33:24 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 08:28:52 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:30:22 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:30:22 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 08:33:15 - INFO - [SUCCESS] ✅ Configuration validated successfully
+2026-05-12 08:33:25 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:33:37 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:33:37 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 08:43:08 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:43:08 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 08:43:25 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 08:43:25 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 11:24:10 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 11:24:10 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 11:43:54 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 11:43:54 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 12:00:01 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 12:00:01 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 12:02:06 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 12:02:06 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 12:17:11 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 12:17:11 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 12:44:53 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 12:44:53 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 12:46:05 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:09 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:13 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:14 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:16 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:19 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:23 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:23 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:24 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:26 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:29 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:32 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:35 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:38 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:41 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:44 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:44 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:47 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:50 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:53 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:56 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:58 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:46:59 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:04 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:04 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:06 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:07 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:10 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:13 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:14 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:16 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:17 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:20 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:22 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:22 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:25 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:28 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:30 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:31 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:34 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:36 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:38 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:41 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:41 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:45 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:47 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:48 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:50 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:50 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:53 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:56 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:59 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:47:59 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:02 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:43 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:45 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:45 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:45 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:45 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:48:46 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:49:26 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:49:30 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:58:37 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 12:58:37 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:03:21 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:03:21 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:03:25 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:14 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:14 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:15 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:40 - ERROR - [ERROR] Send emails error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:44 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:04:47 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:05:07 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:05:07 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:06:36 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:06:36 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:09:22 - ERROR - [ERROR] Leads fetch error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:10:10 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:10:10 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:11:38 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:40 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:42 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:44 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:46 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:48 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:50 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:52 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:54 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:56 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:11:58 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:30:57 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:30:57 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:31:06 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:10 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:13 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:16 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:18 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:21 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:24 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:26 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:29 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:31 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:33 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:35 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:36 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:38 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:40 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:42 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:50 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:52 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:54 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:56 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:31:58 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:00 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:02 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:05 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:07 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:09 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:11 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:15 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:17 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:19 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:22 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:24 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:26 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:28 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:31 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:34 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:38 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:40 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:43 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:45 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:48 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:51 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:53 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:56 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:32:59 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:33:01 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:33:03 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:33:05 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:33:08 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:33:09 - ERROR - [ERROR] Dashboard data error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:38:20 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:38:20 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:42:28 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:42:28 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:48:02 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 13:48:02 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 13:52:32 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:52:32 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:58:43 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 13:58:44 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:23:07 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 14:23:07 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 14:24:41 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 14:24:41 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 14:25:03 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:25:04 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:31:03 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:31:03 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:31:04 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:31:05 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:31:08 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 14:40:08 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 14:40:08 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 15:06:54 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 15:06:54 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 15:14:50 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 15:14:50 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 15:45:11 - ERROR - [ERROR] Dashboard data error: 'charmap' codec can't encode characters in position 2-3: character maps to <undefined>
+2026-05-12 15:50:14 - INFO - [SUCCESS] Backup database initialized
+2026-05-12 15:50:14 - INFO - [SUCCESS] Compliance database initialized
+2026-05-12 15:57:12 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:53 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:53 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:53 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:53 - ERROR - [ERROR] Check replies error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:57 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-12 15:57:59 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 01:43:25 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 01:43:25 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 10:50:31 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 10:50:32 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:05:51 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:05:52 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:10:52 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:10:52 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:10:59 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:10:59 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:48:26 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 11:48:27 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 12:22:51 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-13 12:22:51 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 11:28:00 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 11:28:02 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 12:04:23 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 12:04:24 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 16:03:17 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
+2026-05-15 16:03:17 - ERROR - [ERROR] Niche health error: 'NoneType' object has no attribute 'get'
