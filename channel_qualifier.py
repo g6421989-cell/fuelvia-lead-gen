@@ -10,28 +10,99 @@
 #
 # Score is for SORTING only — does NOT disqualify anyone.
 # If email + active → QUALIFIED. That's it.
+#
+# v2 changes:
+#   - Gmail ALLOWED (1K-20K sub creators legitimately use Gmail)
+#   - Obfuscated email detection: john[at]gmail.com, john AT biz.com
+#   - "dot" substitution: domain[dot]com handled
 # ============================================================
 
 import re
 from typing import Dict, List, Optional, Tuple
 
+# ── Standard email regex ──────────────────────────────────────────────
 EMAIL_REGEX = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
 
+# ── Obfuscated email patterns ─────────────────────────────────────────
+# Catches: john[at]gmail.com / john (at) biz.com / john AT domain.com
+_OBFUSCATED_AT_RE = re.compile(
+    r'\b([A-Za-z0-9._%+-]{2,})\s*'
+    r'(?:\[at\]|\(at\)|【at】|＠|\bAT\b)\s*'
+    r'([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b',
+    re.IGNORECASE,
+)
+
+# Catches: john@domain[dot]com / john@domain (dot) org
+_OBFUSCATED_DOT_RE = re.compile(
+    r'\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)'
+    r'\s*(?:\[dot\]|\(dot\)|\bDOT\b)\s*'
+    r'([A-Za-z]{2,})\b',
+    re.IGNORECASE,
+)
+
+# Domains that are clearly placeholders / not real contact emails
 EXCLUDED_DOMAINS = {
-    "example.com", "youremail.com", "gmail.com", "email.com",
+    "example.com", "youremail.com", "email.com",
     "noreply.com", "sentry.io", "wixpress.com", "domain.com",
-    "yourname.com", "company.com", "business.com"
+    "yourname.com", "company.com", "business.com", "test.com",
+    "placeholder.com", "sample.com", "mail.com",
 }
+# NOTE: gmail.com intentionally ALLOWED — creators 1K–20K subs often use Gmail
+#       as their real business contact email. Excluding it loses ~40% of leads.
+
+
+def _is_valid_email(email: str) -> bool:
+    """Basic validation: has @ and TLD, not a placeholder domain."""
+    if not email or "@" not in email:
+        return False
+    parts = email.split("@")
+    if len(parts) != 2:
+        return False
+    domain = parts[1].lower()
+    if domain in EXCLUDED_DOMAINS:
+        return False
+    if "." not in domain:
+        return False
+    # Reject obviously fake local parts
+    local = parts[0].lower()
+    if local in ("email", "youremail", "yourname", "name", "user", "contact",
+                 "noreply", "no-reply", "info", "hello", "test"):
+        return False
+    return True
 
 
 def extract_email_from_text(text: str) -> Optional[str]:
-    """Extract first valid business email from any text block."""
+    """
+    Extract first valid contact email from any text block.
+
+    Handles:
+    1. Standard format:     john@business.com
+    2. [at] obfuscation:    john[at]business.com
+    3. AT obfuscation:      john AT business.com
+    4. [dot] obfuscation:   john@business[dot]com
+    """
     if not text:
         return None
+
+    # ── 1. Standard email format ──────────────────────────────
     for match in EMAIL_REGEX.findall(text):
-        domain = match.split("@")[1].lower()
-        if domain not in EXCLUDED_DOMAINS and "." in domain:
+        if _is_valid_email(match):
             return match.lower()
+
+    # ── 2. [at] and AT obfuscation ────────────────────────────
+    m = _OBFUSCATED_AT_RE.search(text)
+    if m:
+        reconstructed = f"{m.group(1)}@{m.group(2)}".lower()
+        if _is_valid_email(reconstructed):
+            return reconstructed
+
+    # ── 3. [dot] obfuscation (email has @ but TLD is obfuscated) ─
+    m = _OBFUSCATED_DOT_RE.search(text)
+    if m:
+        reconstructed = f"{m.group(1)}.{m.group(2)}".lower()
+        if _is_valid_email(reconstructed):
+            return reconstructed
+
     return None
 
 
@@ -40,8 +111,8 @@ def extract_email_from_all_sources(
     videos_data: List[Dict]
 ) -> Optional[str]:
     """
-    Try to find a business email in order of priority:
-      1. Channel description
+    Try to find a contact email in order of priority:
+      1. Channel description (standard + obfuscated)
       2. Video descriptions (last 5, newest first)
 
     Returns the first valid email found, or None.
@@ -96,7 +167,6 @@ def qualify_channel(
     HARD #2  Last post within 90 days                       → inactive = REJECT
     SOFT     Subscriber count + recency affect score only (0-7)
     """
-    channel_name = channel_data.get("channel_name", "?")
     channel_desc = channel_data.get("description", "")
 
     # ── HARD FILTER 1: find email ─────────────────────────────

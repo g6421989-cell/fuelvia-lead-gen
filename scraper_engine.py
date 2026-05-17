@@ -1,14 +1,22 @@
 # ============================================================
-# SCRAPER ENGINE v2 — Precision Targeting
+# SCRAPER ENGINE v3 — Dual-Source Discovery
 # ============================================================
 # RULES:
 # 1. Hard limit 30 max (enforced in API)
 # 2. Stop at exact target — not before, not after
 # 3. One keyword-location combo at a time
 # 4. Break ALL loops when target is reached
-# 5. Check email BEFORE qualification (save API quota)
+# 5. Check email BEFORE fetching videos (save API quota)
 # 6. Live log shows "Found X of Y"
 # 7. Graceful exhaustion if all combos searched
+#
+# v3 NEW — DUAL-SOURCE DISCOVERY:
+# YouTube channel search only returns its top ~500 popular
+# results for any query. For every keyword-location pair we
+# now ALSO run a VIDEO search and extract channel IDs from
+# those results. Video search surfaces completely different,
+# mostly smaller creators that channel search never shows.
+# Combined pool is typically 3–5x larger per keyword.
 # ============================================================
 
 import re
@@ -76,19 +84,181 @@ def _get_channel(youtube, channel_id: str):
         return None
 
 
+def _video_search_channel_ids(youtube, query: str, max_pages: int = 5) -> list:
+    """
+    Search YouTube VIDEOS for a query and return unique channel IDs.
+
+    Video search surfaces a completely different pool of creators than
+    channel search — typically smaller, niche, less optimised for
+    discovery — which is exactly our target audience.
+
+    Returns an ordered list of channel IDs (deduped internally).
+    Cost: 100 quota units per page (same as channel search).
+    """
+    channel_ids = []
+    seen        = set()
+    next_page   = None
+
+    for _ in range(max_pages):
+        try:
+            params = {
+                "part":             "snippet",
+                "q":                query,
+                "type":             "video",
+                "maxResults":       50,
+                "relevanceLanguage": "en",
+                "order":            "relevance",
+            }
+            if next_page:
+                params["pageToken"] = next_page
+
+            resp  = youtube.search().list(**params).execute()
+            items = resp.get("items", [])
+            if not items:
+                break
+
+            for item in items:
+                cid = (item.get("snippet") or {}).get("channelId")
+                if cid and cid not in seen:
+                    seen.add(cid)
+                    channel_ids.append(cid)
+
+            next_page = resp.get("nextPageToken")
+            if not next_page:
+                break
+            time.sleep(0.2)
+
+        except Exception as e:
+            if "quotaExceeded" in str(e) or "403" in str(e):
+                pass  # caller handles quota rotation
+            break
+
+    return channel_ids
+
+
+def _process_channel(
+    youtube, api_index, notion,
+    cid, seen_ids, blacklist_hits_ref,
+    sub_min, sub_max,
+    niche_key, location_key, keyword, loc,
+    target_leads, qualified,
+    channels_scanned_ref,
+):
+    """
+    Attempt to qualify one channel ID.
+
+    Returns a tuple: (event_list, new_api_index, incremented_blacklist_hits)
+    so the caller can yield events and update counters without managing
+    the internals of qualification.
+    """
+    events = []
+
+    # ── In-run dedup ──────────────────────────────────────────
+    if cid in seen_ids:
+        return events, api_index, blacklist_hits_ref[0]
+    seen_ids.add(cid)
+
+    # ── Permanent blacklist (zero API cost) ───────────────────
+    if is_blacklisted(cid):
+        blacklist_hits_ref[0] += 1
+        return events, api_index, blacklist_hits_ref[0]
+
+    # ── Fetch channel details ─────────────────────────────────
+    details = _get_channel(youtube, cid)
+    if not details:
+        return events, api_index, blacklist_hits_ref[0]
+
+    subs = details["subscriber_count"]
+    if subs < sub_min or (sub_max and subs > sub_max):
+        return events, api_index, blacklist_hits_ref[0]
+
+    channels_scanned_ref[0] += 1
+    name   = details["channel_name"]
+    subs_k = f"{subs/1000:.1f}K" if subs >= 1000 else str(subs)
+
+    events.append(_evt("info", f"  Scanning [{channels_scanned_ref[0]}]: {name} ({subs_k} subs)"))
+
+    # ── RULE 5: Email check FIRST (description only, saves quota) ──
+    early_email = extract_email_from_all_sources(
+        details.get("description", ""),
+        [],  # No videos yet — just check description
+    )
+    if not early_email:
+        events.append(_evt("info", f"    Skip {name}: no email in description"))
+        return events, api_index, blacklist_hits_ref[0]
+
+    # ── Fetch video data ──────────────────────────────────────
+    videos = []
+    for _attempt in range(len(YOUTUBE_APIS)):
+        try:
+            videos = get_videos_for_channel(
+                youtube, cid,
+                uploads_playlist_id=details.get("uploads_playlist_id"),
+                max_videos=5,
+            )
+            break
+        except Exception as ve:
+            if "quotaExceeded" in str(ve) or "403" in str(ve):
+                api_index = (api_index + 1) % len(YOUTUBE_APIS)
+                youtube, _ = _get_youtube(api_index)
+                events.append(_evt("warning", f"Video API quota — rotated to key #{api_index + 1}"))
+            else:
+                events.append(_evt("error", f"Video fetch error ({name}): {str(ve)[:120]}"))
+                break
+
+    days = days_since_last_video(videos)
+    details.update({
+        "days_since_last_video": days,
+        "videos_data":           videos,
+        "niche":                 keyword,
+        "location":              loc,
+    })
+
+    # ── Qualification ─────────────────────────────────────────
+    result = qualify_channel(details, videos, days)
+
+    if not result["qualified"]:
+        events.append(_evt("warning", f"    Skip {name}: {result['reason']}"))
+        return events, api_index, blacklist_hits_ref[0]
+
+    # ── Notion duplicate check ────────────────────────────────
+    try:
+        is_dup, _ = notion.check_duplicate(result["email"])
+        if is_dup:
+            events.append(_evt("warning", f"    Skip {name}: {result['email']} already in database"))
+            add_to_blacklist(cid, name)
+            return events, api_index, blacklist_hits_ref[0]
+    except Exception as de:
+        events.append(_evt("error", f"Notion duplicate check failed ({name}): {str(de)[:100]}"))
+        return events, api_index, blacklist_hits_ref[0]
+
+    # ── QUALIFIED ✓ ───────────────────────────────────────────
+    details["email"]        = result["email"]
+    details["score"]        = result["score"]
+    details["score_reason"] = result["reason"]
+    qualified.append(details)
+
+    found = len(qualified)
+    events.append(_evt(
+        "success",
+        f"Found {found} of {target_leads} requested leads — {name}",
+        {"channel": name, "email": result["email"], "score": result["score"]},
+    ))
+
+    return events, api_index, blacklist_hits_ref[0]
+
+
 # ── Main generator ────────────────────────────────────────
 
 def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_leads: int = None):
     """
     Generator — yields event dicts until exactly max_leads are found.
 
-    RULES:
-    2. Stop at exact target
-    3. One keyword-location combo at a time
-    4. Break ALL loops when target reached
-    5. Check email BEFORE qualification
-    6. Live log shows "Found X of Y"
-    7. Graceful exhaustion message
+    Discovery strategy per keyword-location pair:
+      Phase A: YouTube channel search  (YouTube's popularity-biased pool)
+      Phase B: YouTube VIDEO search    (completely different creator pool)
+
+    Both phases feed into the same qualification pipeline.
     """
     target_leads = max_leads if max_leads and max_leads > 0 else DEFAULT_TARGET_LEADS
 
@@ -97,34 +267,34 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
     loc_list  = LOCATION_OPTIONS.get(location_key, [""])
     sub_min, sub_max = SUBSCRIBER_RANGES.get(sub_range_key, (1000, 20000))
 
-    # ── Initial stats ──────────────────────────────────────
     bl_size = blacklist_size()
     yield _evt("info", f"Niche: {niche_key}  |  Location: {location_key}")
     yield _evt("info", f"Subscriber range: {sub_range_key}")
     yield _evt("info", f"Keywords ({len(keywords)}): {', '.join(keywords)}")
-    yield _evt("info", f"RULE 2: Target exactly {target_leads} leads with valid emails")
-    yield _evt("info", f"RULE 3: Searching one keyword-location combo at a time")
-    yield _evt("info", f"Blacklist: {bl_size} channels permanently skipped from previous runs")
+    yield _evt("info", f"Target: exactly {target_leads} leads with valid emails")
+    yield _evt("info", f"Strategy: Channel search + Video search (dual-source discovery)")
+    yield _evt("info", f"Blacklist: {bl_size} channels permanently skipped")
 
     api_index = 0
     youtube, api_index = _get_youtube(api_index)
     notion    = NotionManager()
 
-    seen_ids         = set()   # dedupes within this run
-    blacklist_hits   = 0       # channels skipped by permanent blacklist
-    qualified        = []      # list of fully-enriched lead dicts
-    channels_scanned = 0
-    target_reached   = False   # flag to break all loops
+    seen_ids         = set()
+    blacklist_hits   = [0]     # list so _process_channel can mutate it
+    qualified        = []
+    channels_scanned = [0]     # same reason
+    target_reached   = False
 
-    # ── RULE 3: Create keyword-location pairs ──────────────
     keyword_location_pairs = []
     for keyword in keywords:
         for loc in loc_list:
             keyword_location_pairs.append((keyword, loc if loc else "Global"))
 
-    yield _evt("info", f"Will search {len(keyword_location_pairs)} keyword-location combinations")
+    yield _evt("info", f"{len(keyword_location_pairs)} keyword-location combinations queued")
 
-    # ── PHASE 1: FIND LEADS (one combo at a time) ─────────
+    # ══════════════════════════════════════════════════════════════
+    # MAIN LOOP — one keyword-location pair at a time
+    # ══════════════════════════════════════════════════════════════
     for pair_idx, (keyword, loc) in enumerate(keyword_location_pairs, 1):
         if target_reached:
             break
@@ -132,17 +302,20 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
         query = f"{keyword} {loc}".strip() if loc != "Global" else keyword
         yield _evt("info", f"[{pair_idx}/{len(keyword_location_pairs)}] Searching: '{query}'")
 
+        # ──────────────────────────────────────────────────────────
+        # PHASE A: YouTube Channel Search
+        # ──────────────────────────────────────────────────────────
+        yield _evt("info", f"  Phase A: channel search…")
         next_page = None
         page_num  = 0
 
-        while len(qualified) < target_leads and page_num < 15:
-            # ─ Search call ───────────────────────────────
+        while len(qualified) < target_leads and page_num < 12:
             try:
                 params = {
-                    "part": "snippet",
-                    "q": query,
-                    "type": "channel",
-                    "maxResults": 50,
+                    "part":             "snippet",
+                    "q":                query,
+                    "type":             "channel",
+                    "maxResults":       50,
                     "relevanceLanguage": "en",
                 }
                 if next_page:
@@ -157,142 +330,111 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
                 if "quotaExceeded" in str(e) or "403" in str(e):
                     api_index = (api_index + 1) % len(YOUTUBE_APIS)
                     youtube, api_index = _get_youtube(api_index)
-                    yield _evt("warning", f"Search API quota hit — rotated to key #{api_index + 1}/{len(YOUTUBE_APIS)}")
+                    yield _evt("warning", f"Search quota — rotated to key #{api_index + 1}/{len(YOUTUBE_APIS)}")
                     time.sleep(1)
                     continue
                 else:
-                    yield _evt("error", f"Search failed for '{query}': {str(e)[:160]}")
+                    yield _evt("error", f"Channel search failed: {str(e)[:160]}")
                     break
 
-            # ─ Per-channel processing ─────────────────────
             for item in items:
-                if len(qualified) >= target_leads:  # ── RULE 2: Stop at exact target
-                    target_reached = True
-                    break
-
-                cid = item["snippet"]["channelId"]
-
-                # ── In-run dedup ─────────────────────────
-                if cid in seen_ids:
-                    continue
-                seen_ids.add(cid)
-
-                # ── Permanent blacklist check (zero API cost) ──
-                if is_blacklisted(cid):
-                    blacklist_hits += 1
-                    continue
-
-                # ── Get basic channel info ───────────────
-                details = _get_channel(youtube, cid)
-                if not details:
-                    continue
-
-                subs = details["subscriber_count"]
-                if subs < sub_min or (sub_max and subs > sub_max):
-                    continue
-
-                channels_scanned += 1
-                name   = details["channel_name"]
-                subs_k = f"{subs/1000:.1f}K" if subs >= 1000 else str(subs)
-
-                yield _evt("info", f"  Scanning [{channels_scanned}]: {name} ({subs_k} subs)")
-
-                # ── RULE 5: Check email FIRST (before qualification) ──
-                email = extract_email_from_all_sources(
-                    details.get("description", ""),
-                    []  # Don't need video data just for email check
-                )
-                if not email:
-                    yield _evt("info", f"    Skip {name}: no email found in description")
-                    continue
-
-                # ── Get video data for qualification ─────
-                videos = []
-                for _attempt in range(len(YOUTUBE_APIS)):
-                    try:
-                        videos = get_videos_for_channel(
-                            youtube, cid,
-                            uploads_playlist_id=details.get("uploads_playlist_id"),
-                            max_videos=5,
-                        )
-                        break
-                    except Exception as ve:
-                        if "quotaExceeded" in str(ve) or "403" in str(ve):
-                            api_index = (api_index + 1) % len(YOUTUBE_APIS)
-                            youtube, api_index = _get_youtube(api_index)
-                            yield _evt("warning", f"Video API quota hit — rotated to key #{api_index + 1}")
-                        else:
-                            yield _evt("error", f"Video fetch error ({name}): {str(ve)[:120]}")
-                            break
-
-                days = days_since_last_video(videos)
-                details.update({
-                    "days_since_last_video": days,
-                    "videos_data":           videos,
-                    "niche":                 keyword,
-                    "location":              loc,
-                })
-
-                # ── Qualification check ──────────────────
-                result = qualify_channel(details, videos, days)
-
-                if not result["qualified"]:
-                    reason = result["reason"]
-                    yield _evt("warning", f"    Skip {name}: {reason}")
-                    continue
-
-                # ── Duplicate check against Notion ──────
-                try:
-                    is_dup, _ = notion.check_duplicate(email)
-                    if is_dup:
-                        yield _evt("warning", f"    Skip {name}: {email} already in database")
-                        add_to_blacklist(cid, name)
-                        continue
-                except Exception as de:
-                    yield _evt("error", f"Notion duplicate check failed ({name}): {str(de)[:100]}")
-                    continue
-
-                # ── QUALIFIED ✓ ─────────────────────────
-                details["email"]        = email
-                details["score"]        = result["score"]
-                details["score_reason"] = result["reason"]
-                qualified.append(details)
-
-                found = len(qualified)
-                # ── RULE 6: Live log shows progress ──
-                yield _evt("success",
-                    f"Found {found} of {target_leads} requested leads — {name}",
-                    {"channel": name, "email": email, "score": result["score"]},
-                )
-
-                time.sleep(0.15)
-
-                # ── RULE 4: Check if target reached after each lead ──
                 if len(qualified) >= target_leads:
                     target_reached = True
                     break
 
+                cid = item["snippet"]["channelId"]
+                events, api_index, _ = _process_channel(
+                    youtube, api_index, notion,
+                    cid, seen_ids, blacklist_hits,
+                    sub_min, sub_max,
+                    niche_key, location_key, keyword, loc,
+                    target_leads, qualified,
+                    channels_scanned,
+                )
+                for ev in events:
+                    yield ev
+                if len(qualified) >= target_leads:
+                    target_reached = True
+                    break
+                time.sleep(0.1)
+
+            if target_reached:
+                break
             next_page = resp.get("nextPageToken")
             if not next_page:
                 break
             page_num += 1
             time.sleep(0.3)
 
-        # ── RULE 6: Message when stopping mid-search ──
         if target_reached:
-            yield _evt("info", f"Target reached — stopping all API calls. Canceling remaining {len(keyword_location_pairs) - pair_idx} keyword-location combos.")
+            yield _evt("info", f"Target reached in Phase A.")
             break
 
-    # ── PHASE 2: SAVE LEADS TO NOTION + BLACKLIST ─────────
+        # ──────────────────────────────────────────────────────────
+        # PHASE B: YouTube Video Search → extract channel IDs
+        # YouTube video search surfaces completely different creators
+        # than channel search — smaller, niche, less algorithm-favoured
+        # ──────────────────────────────────────────────────────────
+        if len(qualified) < target_leads:
+            yield _evt("info", f"  Phase B: video search (different creator pool)…")
+
+            # Also try "video order: date" for very recent uploaders
+            video_ids_relevance = _video_search_channel_ids(youtube, query, max_pages=5)
+            video_ids_recent    = _video_search_channel_ids(
+                youtube, query + " tutorial", max_pages=3
+            )
+
+            # Merge, preserving order, removing already-seen
+            all_video_cids = []
+            _seen_v = set()
+            for cid in video_ids_relevance + video_ids_recent:
+                if cid not in _seen_v:
+                    _seen_v.add(cid)
+                    all_video_cids.append(cid)
+
+            new_cids = [c for c in all_video_cids if c not in seen_ids]
+            yield _evt("info", f"  Video search found {len(new_cids)} new unique channels to check")
+
+            for cid in new_cids:
+                if len(qualified) >= target_leads:
+                    target_reached = True
+                    break
+
+                events, api_index, _ = _process_channel(
+                    youtube, api_index, notion,
+                    cid, seen_ids, blacklist_hits,
+                    sub_min, sub_max,
+                    niche_key, location_key, keyword, loc,
+                    target_leads, qualified,
+                    channels_scanned,
+                )
+                for ev in events:
+                    yield ev
+                time.sleep(0.1)
+
+            if target_reached:
+                yield _evt("info", f"Target reached in Phase B.")
+                break
+
+        # ── Progress update after each keyword-location pair ──
+        yield _evt(
+            "progress",
+            f"  Pair {pair_idx}/{len(keyword_location_pairs)} done — {len(qualified)}/{target_leads} leads found",
+            {"found": len(qualified), "target": target_leads},
+        )
+
+    # ══════════════════════════════════════════════════════════════
+    # PHASE 2: SAVE LEADS TO NOTION + BLACKLIST
+    # ══════════════════════════════════════════════════════════════
     if not qualified:
         elapsed = int((datetime.now() - start_ts).total_seconds())
         yield _evt("error",
-            f"No qualified leads found after scanning {channels_scanned} channels "
-            f"({blacklist_hits} skipped by blacklist). "
-            f"Try a broader niche or wider subscriber range.",
+            f"No qualified leads found after scanning {channels_scanned[0]} channels "
+            f"({blacklist_hits[0]} skipped by blacklist). "
+            f"Try a broader niche, wider subscriber range, or different location.",
         )
         yield _evt("complete", "Search complete — 0 leads found", {
-            "leads_found": 0, "channels_scanned": channels_scanned,
+            "leads_found": 0, "channels_scanned": channels_scanned[0],
             "time_seconds": elapsed, "niche": niche_key,
         })
         return
@@ -300,12 +442,10 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
     found_count = len(qualified)
     yield _evt("info", "─" * 50)
 
-    # ── RULE 7: Graceful exhaustion message ──
     if found_count < target_leads:
-        yield _evt("info", f"Search complete — found {found_count} leads out of {target_leads} requested.")
-        yield _evt("info", f"All keyword and location combinations exhausted. Saving {found_count} lead(s).")
+        yield _evt("info", f"Search exhausted — found {found_count}/{target_leads} requested. Saving.")
     else:
-        yield _evt("info", f"Target reached — {found_count} leads found. Saving to Notion + blacklist...")
+        yield _evt("info", f"Target reached — {found_count} leads. Saving to Notion + blacklist…")
 
     saved = 0
     for i, lead in enumerate(qualified, 1):
@@ -336,11 +476,11 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
     new_bl     = blacklist_size()
 
     yield _evt("complete",
-        f"Done! {saved} leads saved  |  {channels_scanned} channels scanned  |  "
-        f"{blacklist_hits} skipped by blacklist  |  {new_bl} total in blacklist  |  {mins}m {secs}s",
+        f"Done! {saved} leads saved  |  {channels_scanned[0]} channels scanned  |  "
+        f"{blacklist_hits[0]} skipped by blacklist  |  {new_bl} total in blacklist  |  {mins}m {secs}s",
         {
             "leads_found":      saved,
-            "channels_scanned": channels_scanned,
+            "channels_scanned": channels_scanned[0],
             "time_seconds":     elapsed,
             "niche":            niche_key,
             "location":         location_key,
