@@ -5,6 +5,8 @@
       "password": "Rooted@14",
       "smtp_server": "smtp.hostinger.com",
       "smtp_port": 587,
+      "imap_server": "imap.hostinger.com",
+      "imap_port": 993,
       "use_tls": true
     },
     {
@@ -12,6 +14,8 @@
       "password": "Rooted@14",
       "smtp_server": "smtp.hostinger.com",
       "smtp_port": 587,
+      "imap_server": "imap.hostinger.com",
+      "imap_port": 993,
       "use_tls": true
     },
     {
@@ -19,6 +23,8 @@
       "password": "Rooted@14",
       "smtp_server": "smtp.hostinger.com",
       "smtp_port": 587,
+      "imap_server": "imap.hostinger.com",
+      "imap_port": 993,
       "use_tls": true
     }
   ],

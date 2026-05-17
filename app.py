@@ -694,6 +694,13 @@ def _run_send_emails():
             "progress": 0, "total": 0, "logs": [],
         })
 
+    # ── Guard: email accounts must be configured ──────────────
+    if not OUTREACH_ACCOUNTS:
+        _alog(f"[{_ts()}] ❌ No outreach accounts loaded. Add email_config.json or EMAIL_CONFIG env var.")
+        with _email_action_lock:
+            _email_action_state["status"] = "error"
+        return
+
     # ── Step 1: connect to Notion ──────────────────────────────
     _alog(f"[{_ts()}]    Step 1: Connecting to Notion…")
     try:
@@ -804,12 +811,17 @@ def _run_send_emails():
         if claude_failed:
             _alog(f"[{_ts()}] ⚠  WARNING: Claude API failed — fallback template used for {cname}")
 
-        # ── Send ──────────────────────────────────────────
-        account = _next_account()
+        # ── Pick account with room (rotate past full ones) ────
+        account = None
+        for _try in range(len(OUTREACH_ACCOUNTS)):
+            candidate = _next_account()
+            if has_room_today(candidate["email"]):
+                account = candidate
+                break
+            _alog(f"[{_ts()}]    {candidate['email']} at daily limit — trying next account…")
 
-        # ── Check daily limit (40/account/day) ──
-        if not has_room_today(account["email"]):
-            _alog(f"[{_ts()}] 🛑 Daily limit reached for {account['email']} — pausing at {sent}/{total} sent")
+        if not account:
+            _alog(f"[{_ts()}] 🛑 All {len(OUTREACH_ACCOUNTS)} accounts at daily limit ({len(OUTREACH_ACCOUNTS)*40} total/day) — pausing at {sent}/{total} sent")
             _alog(f"[{_ts()}] Resume tomorrow for the remaining {total - sent} leads")
             with _email_action_lock:
                 _email_action_state["status"] = "completed"
@@ -885,6 +897,13 @@ def _run_send_followup():
         })
     reset_expired()  # Clean up old date records
 
+    # ── Guard: email accounts must be configured ──────────────
+    if not OUTREACH_ACCOUNTS:
+        _alog(f"[{_ts()}] ❌ No outreach accounts loaded. Add email_config.json or EMAIL_CONFIG env var.")
+        with _email_action_lock:
+            _email_action_state["status"] = "error"
+        return
+
     try:
         notion  = NotionManager()
         records = notion.get_all_contacted_leads()
@@ -956,13 +975,10 @@ def _run_send_followup():
                     _alog(f"[{_ts()}] ⚠  [{i}/{total}] Skip {cname} — no matching account for '{sent_from}'")
                 continue
 
-            # ── Check daily limit (40/account/day) ──
+            # ── Check daily limit — follow-ups must use SAME account so no rotation here ──
             if not has_room_today(account["email"]):
-                _alog(f"[{_ts()}] 🛑 Daily limit reached for {account['email']} — pausing at {sent}/{total} sent")
-                _alog(f"[{_ts()}] Resume tomorrow for the remaining {total - sent} follow-ups")
-                with _email_action_lock:
-                    _email_action_state["status"] = "completed"
-                return
+                _alog(f"[{_ts()}] 🛑 [{i}/{total}] Daily limit reached for {account['email']} — skipping {cname} (will retry tomorrow)")
+                continue   # skip this lead today; don't abort the whole run
 
             _alog(f"[{_ts()}]    [{i}/{total}] Sending follow-up to {email} via {account['email']}…")
             ok = _smtp_send(account, email, subject, body)
@@ -1051,7 +1067,9 @@ def _run_check_replies():
 
             _alog(f"[{_ts()}]    Connecting to {account['email']}…")
             try:
-                mail = imaplib.IMAP4_SSL(account.get("imap_server", "imap.gmail.com"), timeout=30)
+                imap_host = account.get("imap_server", "imap.hostinger.com")
+                imap_port = account.get("imap_port", 993)
+                mail = imaplib.IMAP4_SSL(imap_host, imap_port)
                 mail.login(account["email"], account["password"])
                 mail.select("INBOX")
 
@@ -1179,6 +1197,7 @@ def _start_action(target_fn, name: str):
         if _email_action_state.get("status") == "running":
             action = _email_action_state.get("action", "?")
             return jsonify({"error": f"Action already running: {action}"}), 400
+    _email_action_stop.clear()   # ensure stop flag is clear before new thread starts
     t = threading.Thread(target=target_fn, daemon=True, name=f"fuelvia-{name}")
     t.start()
     return jsonify({"success": True})

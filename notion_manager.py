@@ -142,7 +142,7 @@ class NotionManager:
                     "email": lead_data.get("email") or None   # Notion rejects empty string
                 },
                 "YouTube URL": {
-                    "url": lead_data.get("youtube_url", "")
+                    "url": lead_data.get("youtube_url") or None   # Notion rejects empty string for URL fields
                 },
                 "Subscriber Count": {
                     "number": int(lead_data.get("subscriber_count", 0))
@@ -162,9 +162,10 @@ class NotionManager:
                 "Date Added": {
                     "date": {"start": date.today().isoformat()}
                 },
-                "Last Contact": {
-                    "date": {"start": date.today().isoformat()}
-                },
+                # NOTE: Last Contact is intentionally NOT set on create.
+                # It is only set when an email is actually sent (update_lead_status).
+                # Setting it here would corrupt analytics by making new leads
+                # appear as already contacted.
                 "Replied": {
                     "checkbox": False
                 },
@@ -314,35 +315,14 @@ class NotionManager:
         return self._request("PATCH", f"/pages/{page_id}", json=payload)
 
     def get_leads_by_date_and_status(self, target_date, status):
-        """Get leads added on specific date with specific status"""
-        payload = {
-            "filter": {
-                "and": [
-                    {
-                        "property": "Date Added",
-                        "date": {"equals": target_date.isoformat()}
-                    },
-                    {
-                        "property": "Status",
-                        "select": {"equals": status}
-                    },
-                    {
-                        "property": "Replied",
-                        "checkbox": {"equals": False}
-                    }
-                ]
-            }
-        }
-
-        result = self._request(
-            "POST",
-            f"/databases/{self.database_id}/query",
-            json=payload
-        )
-
-        if result and result.get("results"):
-            return result["results"]
-        return []
+        """Get leads added on specific date with specific status (paginated)."""
+        return self._query_all({
+            "and": [
+                {"property": "Date Added", "date":     {"equals": target_date.isoformat()}},
+                {"property": "Status",     "select":   {"equals": status}},
+                {"property": "Replied",    "checkbox": {"equals": False}},
+            ]
+        })
 
     def get_leads_for_followup_1(self):
         """Get yesterday's Contacted leads that haven't replied (for automated daily cron)"""
@@ -353,98 +333,47 @@ class NotionManager:
         Get ALL leads with Status='Contacted' that haven't replied.
         No date filter — for the manual 'Send Follow-ups' button.
         Leads with Status='Replied' or Replied=True are excluded automatically.
+        Uses _query_all() so leads 101+ are not silently lost.
         """
-        payload = {
-            "filter": {
-                "and": [
-                    {
-                        "property": "Status",
-                        "select": {"equals": "Contacted"}
-                    },
-                    {
-                        "property": "Replied",
-                        "checkbox": {"equals": False}
-                    }
-                ]
-            }
-        }
-        result = self._request(
-            "POST",
-            f"/databases/{self.database_id}/query",
-            json=payload
-        )
-        if result and result.get("results"):
-            return result["results"]
-        return []
+        return self._query_all({
+            "and": [
+                {"property": "Status",  "select":   {"equals": "Contacted"}},
+                {"property": "Replied", "checkbox": {"equals": False}},
+            ]
+        })
 
     def get_leads_for_followup_2(self):
-        """Get 2-days-ago leads that have had F1 sent"""
+        """Get 2-days-ago leads that have had F1 sent (paginated)."""
         two_days_ago = date.today() - timedelta(days=2)
-        payload = {
-            "filter": {
-                "and": [
-                    {
-                        "property": "Date Added",
-                        "date": {"equals": two_days_ago.isoformat()}
-                    },
-                    {
-                        "property": "Status",
-                        "select": {"equals": "Follow-up 1 Sent"}
-                    },
-                    {
-                        "property": "Replied",
-                        "checkbox": {"equals": False}
-                    }
-                ]
-            }
-        }
-
-        result = self._request(
-            "POST",
-            f"/databases/{self.database_id}/query",
-            json=payload
-        )
-
-        if result and result.get("results"):
-            return result["results"]
-        return []
+        return self._query_all({
+            "and": [
+                {"property": "Date Added", "date":     {"equals": two_days_ago.isoformat()}},
+                {"property": "Status",     "select":   {"equals": "Follow-up 1 Sent"}},
+                {"property": "Replied",    "checkbox": {"equals": False}},
+            ]
+        })
 
     def get_no_response_candidates(self):
-        """Get leads that are 3+ days old and haven't been marked no response"""
+        """Get leads 3+ days old not yet marked no-response (paginated)."""
         three_days_ago = date.today() - timedelta(days=3)
-        payload = {
-            "filter": {
-                "and": [
-                    {
-                        "property": "Date Added",
-                        "date": {"before": three_days_ago.isoformat()}
-                    },
-                    {
-                        "property": "Status",
-                        "select": {"equals": "Follow-up Sent"}
-                    },
-                    {
-                        "property": "Replied",
-                        "checkbox": {"equals": False}
-                    }
-                ]
-            }
-        }
+        return self._query_all({
+            "and": [
+                {"property": "Date Added", "date":     {"before": three_days_ago.isoformat()}},
+                {"property": "Status",     "select":   {"equals": "Follow-up Sent"}},
+                {"property": "Replied",    "checkbox": {"equals": False}},
+            ]
+        })
 
-        result = self._request(
-            "POST",
-            f"/databases/{self.database_id}/query",
-            json=payload
-        )
-
-        if result and result.get("results"):
-            return result["results"]
-        return []
-
-    def get_all_leads(self):
-        """Get all leads from database"""
-        payload = {"page_size": 100}
-        all_records = []
+    def _query_all(self, filter_payload: dict = None) -> list:
+        """
+        Paginated Notion query — fetches ALL matching records, not just first 100.
+        All filtered query methods must use this instead of a single _request() call.
+        Notion returns max 100 per page; without pagination leads 101+ are silently lost.
+        """
+        payload      = {"page_size": 100}
+        if filter_payload:
+            payload["filter"] = filter_payload
+        all_records  = []
         start_cursor = None
 
         while True:
@@ -468,6 +397,10 @@ class NotionManager:
                 break
 
         return all_records
+
+    def get_all_leads(self):
+        """Get all leads from database (paginated)."""
+        return self._query_all()
 
     def get_system_stats(self):
         """Get overall system statistics"""
