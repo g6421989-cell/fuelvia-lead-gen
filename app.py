@@ -384,7 +384,7 @@ def _extract_full_lead(record: dict) -> dict:
 # ── Auth ───────────────────────────────────────────────────────
 
 def _auth() -> bool:
-    return session.get("auth") is True
+    return True  # Password removed — open access
 
 
 # ── Page ───────────────────────────────────────────────────────

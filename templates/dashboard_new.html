@@ -228,24 +228,10 @@
 <body>
 
 <!-- ── LOGIN ───────────────────────────────────────────────────────── -->
-<div id="login-screen">
-    <div class="login-box">
-        <div class="login-logo">Fuelvia</div>
-        <div class="login-tagline">Lead Generation</div>
-        <div class="form-group" style="text-align:left; margin-bottom:0;">
-            <label>Password</label>
-            <input type="password" id="login-password" placeholder="Enter dashboard password"
-                   onkeydown="if(event.key==='Enter') handleLogin()">
-        </div>
-        <button class="btn btn-primary mt-20" onclick="handleLogin()" style="width:100%;justify-content:center;">
-            Sign In
-        </button>
-        <div class="login-foot">Fuelvia — Video Editing Agency</div>
-    </div>
-</div>
+<div id="login-screen" style="display:none;"></div>
 
 <!-- ── DASHBOARD ───────────────────────────────────────────────────── -->
-<div id="dashboard" class="hidden">
+<div id="dashboard">
 
     <!-- SIDEBAR -->
     <div class="sidebar">
@@ -1029,6 +1015,10 @@ function showReplyBody(r) {
     document.getElementById('modal-message').textContent = r.message || r.reply_message || 'No message body stored.';
     openModal();
 }
+
+// ── Auto-load on page open (no login required) ────────────────────
+loadDashboard();
+startPolling();
 </script>
 </body>
 </html>
