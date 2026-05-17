@@ -49,7 +49,7 @@ import os
 
 from googleapiclient.discovery import build as _yt_build
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response
 
 from config import (
     NICHE_OPTIONS, LOCATION_OPTIONS, SUBSCRIBER_RANGES,
@@ -1245,6 +1245,163 @@ def admin_change():
             DASHBOARD_PASSWORD = new_pw
             return jsonify({"success": True, "message": "Password updated"})
     return jsonify({"success": False, "error": f"Unknown change type: {change_type}"}), 400
+
+
+# ── Export CSV ────────────────────────────────────────────────
+
+@app.route("/api/export-csv")
+def api_export_csv():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        import csv
+        import io as _sio
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        leads   = [_extract_full_lead(r) for r in records]
+        leads.sort(key=lambda x: x["date_added"], reverse=True)
+        output = _sio.StringIO()
+        fields = [
+            "channel_name", "email", "subscriber_count", "niche", "location",
+            "score", "status", "replied", "email_sent_from", "date_added",
+            "last_contact", "reply_date", "reply_message", "notes", "youtube_url",
+        ]
+        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for lead in leads:
+            writer.writerow(lead)
+        return Response(
+            output.getvalue().encode("utf-8"),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=fuelvia-leads.csv"},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Analytics chart data ───────────────────────────────────────
+
+@app.route("/api/analytics-data")
+def api_analytics_data():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        emails_by_day  = {}
+        replies_by_day = {}
+        for r in records:
+            lead = _extract_full_lead(r)
+            # Emails: group by last_contact date
+            contact_d = (lead.get("last_contact") or "").split("T")[0]
+            if contact_d and lead.get("status") not in ("New", ""):
+                emails_by_day[contact_d] = emails_by_day.get(contact_d, 0) + 1
+            # Replies: group by reply_date
+            reply_d = (lead.get("reply_date") or "").split("T")[0]
+            if reply_d:
+                replies_by_day[reply_d] = replies_by_day.get(reply_d, 0) + 1
+        # Fill with last 14 days if no data
+        all_dates = sorted(set(list(emails_by_day.keys()) + list(replies_by_day.keys())))
+        if not all_dates:
+            all_dates = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+        labels      = all_dates[-30:]
+        emails_data = [emails_by_day.get(d, 0)  for d in labels]
+        replies_data= [replies_by_day.get(d, 0) for d in labels]
+        return jsonify({"labels": labels, "emails": emails_data, "replies": replies_data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── AI Email Preview ───────────────────────────────────────────
+
+@app.route("/api/preview-email", methods=["POST"])
+def api_preview_email():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data    = request.get_json(force=True)
+        lead_id = data.get("lead_id", "")
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        lead    = None
+        for r in records:
+            if r.get("id") == lead_id:
+                lead = _extract_full_lead(r)
+                break
+        if not lead:
+            return jsonify({"error": "Lead not found"}), 404
+        channel_data, videos = _fetch_youtube_for_lead(lead.get("youtube_url") or "")
+        merged = {
+            "channel_name":     (channel_data.get("channel_name") or lead.get("channel_name") or "Unknown") if channel_data else (lead.get("channel_name") or "Unknown"),
+            "niche":            lead.get("niche") or "content creation",
+            "subscriber_count": (channel_data.get("subscriber_count") or lead.get("subscriber_count") or 0) if channel_data else (lead.get("subscriber_count") or 0),
+            "days_since_upload": days_since_last_video(videos),
+        }
+        used_claude = False
+        try:
+            subject, body = write_personalized_initial_email(merged, videos)
+            used_claude = True
+        except Exception:
+            n = merged["channel_name"]
+            subject = f"{n} — Free video edit (no strings)"
+            body = (
+                f"Quick one — I run Fuelvia, a video editing agency.\n\n"
+                f"We'd like to edit ONE of {n}'s videos completely free. "
+                f"No credit card, no strings. You keep the video either way.\n\n"
+                f"Reply \"I'm in\" and I'll send a secure upload link.\n\n"
+                f"- {SENDER_NAME}\nFounder, Fuelvia\nfuelviaa.com"
+            )
+        return jsonify({
+            "subject":      subject,
+            "body":         body,
+            "channel_name": merged["channel_name"],
+            "used_claude":  used_claude,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Campaign History ───────────────────────────────────────────
+
+@app.route("/api/campaign-history")
+def api_campaign_history():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        by_date = {}
+        for r in records:
+            lead = _extract_full_lead(r)
+            contact_d = (lead.get("last_contact") or "").split("T")[0]
+            if not contact_d or lead.get("status") in ("New", ""):
+                continue
+            if contact_d not in by_date:
+                by_date[contact_d] = {"date": contact_d, "emails": 0, "followups": 0, "replies": 0, "niches": set(), "accounts": set()}
+            by_date[contact_d]["emails"] += 1
+            s = lead.get("status", "")
+            if "Follow-up" in s:
+                by_date[contact_d]["followups"] += 1
+            if s == "Replied":
+                by_date[contact_d]["replies"] += 1
+            if lead.get("niche"):
+                by_date[contact_d]["niches"].add(lead["niche"])
+            if lead.get("email_sent_from"):
+                by_date[contact_d]["accounts"].add(lead["email_sent_from"])
+        campaigns = []
+        for d, c in sorted(by_date.items(), reverse=True):
+            campaigns.append({
+                "date":       d,
+                "emails":     c["emails"],
+                "followups":  c["followups"],
+                "replies":    c["replies"],
+                "reply_rate": round(c["replies"] / c["emails"] * 100, 1) if c["emails"] else 0,
+                "niches":     list(c["niches"]),
+                "accounts":   list(c["accounts"]),
+            })
+        return jsonify({"campaigns": campaigns})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Entry point ────────────────────────────────────────────────
