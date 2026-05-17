@@ -21,7 +21,7 @@
 
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
 
 from config import (
@@ -84,7 +84,12 @@ def _get_channel(youtube, channel_id: str):
         return None
 
 
-def _video_search_channel_ids(youtube, query: str, max_pages: int = 5) -> list:
+def _video_search_channel_ids(
+    youtube,
+    query: str,
+    max_pages: int = 5,
+    recency_days: int = None,
+) -> list:
     """
     Search YouTube VIDEOS for a query and return unique channel IDs.
 
@@ -92,12 +97,22 @@ def _video_search_channel_ids(youtube, query: str, max_pages: int = 5) -> list:
     channel search — typically smaller, niche, less optimised for
     discovery — which is exactly our target audience.
 
+    recency_days: if set, only return videos uploaded in the last N days.
+                  This finds channels that just became active / just crossed
+                  the subscriber threshold — brand new to any scraper.
+                  Use 30 for "recently active", 90 for broader freshness.
+
     Returns an ordered list of channel IDs (deduped internally).
     Cost: 100 quota units per page (same as channel search).
     """
     channel_ids = []
     seen        = set()
     next_page   = None
+
+    published_after = None
+    if recency_days:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=recency_days)
+        published_after = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     for _ in range(max_pages):
         try:
@@ -107,8 +122,10 @@ def _video_search_channel_ids(youtube, query: str, max_pages: int = 5) -> list:
                 "type":             "video",
                 "maxResults":       50,
                 "relevanceLanguage": "en",
-                "order":            "relevance",
+                "order":            "date",   # newest uploads first = freshest channels
             }
+            if published_after:
+                params["publishedAfter"] = published_after
             if next_page:
                 params["pageToken"] = next_page
 
@@ -378,16 +395,25 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
         if len(qualified) < target_leads:
             yield _evt("info", f"  Phase B: video search (different creator pool)…")
 
-            # Also try "video order: date" for very recent uploaders
-            video_ids_relevance = _video_search_channel_ids(youtube, query, max_pages=5)
-            video_ids_recent    = _video_search_channel_ids(
-                youtube, query + " tutorial", max_pages=3
+            # Sweep 1: relevance-ordered (broad pool)
+            video_ids_broad = _video_search_channel_ids(
+                youtube, query, max_pages=5,
+            )
+            # Sweep 2: recently uploaded (last 45 days) — finds channels that just
+            #          became active or just crossed the subscriber threshold.
+            #          These are the freshest leads no competitor has contacted yet.
+            video_ids_fresh = _video_search_channel_ids(
+                youtube, query, max_pages=4, recency_days=45,
+            )
+            # Sweep 3: slightly different query variant for more variety
+            video_ids_variant = _video_search_channel_ids(
+                youtube, query + " tips", max_pages=3,
             )
 
-            # Merge, preserving order, removing already-seen
+            # Merge all, preserving order, deduped
             all_video_cids = []
             _seen_v = set()
-            for cid in video_ids_relevance + video_ids_recent:
+            for cid in video_ids_broad + video_ids_fresh + video_ids_variant:
                 if cid not in _seen_v:
                     _seen_v.add(cid)
                     all_video_cids.append(cid)
