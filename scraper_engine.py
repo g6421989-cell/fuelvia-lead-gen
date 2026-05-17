@@ -51,6 +51,8 @@ def _evt(type_: str, message: str, data: dict = None) -> dict:
 
 
 def _get_youtube(api_index: int):
+    if not YOUTUBE_APIS:
+        raise ValueError("No YouTube API keys configured — add YOUTUBE_API_1 to environment variables.")
     key = YOUTUBE_APIS[api_index % len(YOUTUBE_APIS)]
     return build("youtube", "v3", developerKey=key), api_index
 
@@ -278,6 +280,18 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
 
     Both phases feed into the same qualification pipeline.
     """
+    # ── Guard: API keys must be configured ───────────────────────────
+    if not YOUTUBE_APIS:
+        yield _evt("error",
+            "No YouTube API keys found. "
+            "Add YOUTUBE_API_1 (and more) to your environment variables, then restart."
+        )
+        yield _evt("complete", "Scrape aborted — no API keys", {
+            "leads_found": 0, "channels_scanned": 0,
+            "time_seconds": 0, "niche": niche_key,
+        })
+        return
+
     target_leads = max_leads if max_leads and max_leads > 0 else DEFAULT_TARGET_LEADS
 
     start_ts  = datetime.now()
