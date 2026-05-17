@@ -32,6 +32,7 @@ from notion_manager import NotionManager
 from youtube_enricher import get_videos_for_channel, days_since_last_video
 from channel_qualifier import qualify_channel, extract_email_from_all_sources
 from channel_blacklist import is_blacklisted, add_to_blacklist, blacklist_size
+from claude_helpers import generate_keyword_variations
 
 DEFAULT_TARGET_LEADS = 30
 
@@ -287,10 +288,22 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
     bl_size = blacklist_size()
     yield _evt("info", f"Niche: {niche_key}  |  Location: {location_key}")
     yield _evt("info", f"Subscriber range: {sub_range_key}")
+    yield _evt("info", f"Blacklist: {bl_size} channels permanently skipped")
+
+    # ── Keyword variation expansion (one Claude call) ─────────────────
+    yield _evt("info", f"Generating keyword variations with Claude…")
+    variations = generate_keyword_variations(niche_key, keywords)
+    if variations:
+        keywords = keywords + variations
+        yield _evt("success",
+            f"Claude added {len(variations)} keyword variations → {len(keywords)} total keywords"
+        )
+    else:
+        yield _evt("info", f"No variations generated (Claude unavailable) — using {len(keywords)} base keywords")
+
     yield _evt("info", f"Keywords ({len(keywords)}): {', '.join(keywords)}")
     yield _evt("info", f"Target: exactly {target_leads} leads with valid emails")
     yield _evt("info", f"Strategy: Channel search + Video search (dual-source discovery)")
-    yield _evt("info", f"Blacklist: {bl_size} channels permanently skipped")
 
     api_index = 0
     youtube, api_index = _get_youtube(api_index)

@@ -311,3 +311,63 @@ Respond ONLY as valid JSON:
 
 # ── LEGACY ALIAS ──────────────────────────────────────────────
 write_personalized_followup_2 = write_personalized_followup_1
+
+
+# ── KEYWORD VARIATION GENERATOR ───────────────────────────────
+
+def generate_keyword_variations(niche_key: str, existing_keywords: list) -> list:
+    """
+    Generate 7 fresh YouTube search query variations for a niche.
+
+    Called ONCE at scrape start — one API call, zero config changes.
+    Returns a list of new query strings to append to the keyword pool.
+    Falls back to [] silently if Claude is unavailable so scraping
+    continues uninterrupted with the original keywords.
+
+    Why this helps:
+      - Surfaces sub-niches and synonyms not in config.py
+      - Uses current YouTube language patterns Claude knows
+      - Every scrape session gets slightly different angles
+      - 7 extra queries = up to ~7x more keyword-location pairs
+    """
+    if not existing_keywords:
+        return []
+
+    existing_str = "\n".join(f"- {k}" for k in existing_keywords[:14])
+
+    prompt = f"""You help find YouTube creators in the "{niche_key}" space who post videos to attract coaching or consulting clients.
+
+Generate exactly 7 YouTube search queries that would find creators in this niche or closely related sub-niches.
+
+Do NOT repeat anything from this existing list:
+{existing_str}
+
+Rules:
+- Each query must find people who ACTIVELY POST YouTube videos
+- Include words like "YouTube", "tips", "channel", "how to", or "advice" where natural
+- Cover sub-niches, synonyms, adjacent angles, or more specific breakdowns of "{niche_key}"
+- Keep each query 3-7 words long
+- Vary the style — some with "YouTube", some without, some more specific
+
+Respond ONLY as a JSON array of exactly 7 strings, no explanation, no markdown:
+["query one", "query two", "query three", "query four", "query five", "query six", "query seven"]"""
+
+    raw = call_claude(prompt, max_tokens=250)
+    if not raw:
+        return []
+
+    try:
+        start = raw.find("[")
+        end   = raw.rfind("]") + 1
+        if start == -1 or end == 0:
+            return []
+        variations = json.loads(raw[start:end])
+        if isinstance(variations, list):
+            clean = [v.strip() for v in variations if isinstance(v, str) and v.strip()]
+            # Remove any that are too close to existing keywords (basic dedup)
+            existing_lower = {k.lower() for k in existing_keywords}
+            return [v for v in clean if v.lower() not in existing_lower]
+    except Exception:
+        pass
+
+    return []
