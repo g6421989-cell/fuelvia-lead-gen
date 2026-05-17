@@ -55,18 +55,21 @@
 # ============================================================
 
 import os
+from dotenv import load_dotenv
+load_dotenv()   # loads .env file from project root
 
 # ── YouTube API Keys ──────────────────────────────────────────────────
-# Auto-filters out empty/unset keys so adding keys is plug-and-play
+# Supports both naming conventions: YOUTUBE_API_KEY_1 (.env style)
+# and YOUTUBE_API_1 (Render env var style). Auto-filters empty/unset.
 YOUTUBE_APIS = [k for k in [
-    os.getenv("YOUTUBE_API_1"),
-    os.getenv("YOUTUBE_API_2"),
-    os.getenv("YOUTUBE_API_3"),
-    os.getenv("YOUTUBE_API_4"),
-    os.getenv("YOUTUBE_API_5"),   # add in Render when ready
-    os.getenv("YOUTUBE_API_6"),
-    os.getenv("YOUTUBE_API_7"),
-    os.getenv("YOUTUBE_API_8"),
+    os.getenv("YOUTUBE_API_KEY_1") or os.getenv("YOUTUBE_API_1"),
+    os.getenv("YOUTUBE_API_KEY_2") or os.getenv("YOUTUBE_API_2"),
+    os.getenv("YOUTUBE_API_KEY_3") or os.getenv("YOUTUBE_API_3"),
+    os.getenv("YOUTUBE_API_KEY_4") or os.getenv("YOUTUBE_API_4"),
+    os.getenv("YOUTUBE_API_KEY_5") or os.getenv("YOUTUBE_API_5"),
+    os.getenv("YOUTUBE_API_KEY_6") or os.getenv("YOUTUBE_API_6"),
+    os.getenv("YOUTUBE_API_KEY_7") or os.getenv("YOUTUBE_API_7"),
+    os.getenv("YOUTUBE_API_KEY_8") or os.getenv("YOUTUBE_API_8"),
 ] if k]
 
 CURRENT_API_INDEX = 0
