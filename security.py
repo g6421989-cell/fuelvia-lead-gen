@@ -7,12 +7,9 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path
 
-BOT_USER_AGENTS = [
-    'claudebot', 'anthropic', 'gptbot', 'chatgpt-user', 'ccbot',
-    'google-extended', 'perplexitybot', 'youbot', 'bytespider',
-    'headlesschrome', 'phantomjs', 'puppeteer', 'playwright',
-    'selenium', 'curl', 'wget', 'python-requests', 'scrapy'
-]
+# Allowlist: only real browsers pass — everything else gets decoy
+ALLOWED_UA_TOKENS = ('chrome', 'firefox', 'safari', 'edg', 'edge')
+
 
 HONEYPOT_PATHS = ['/admin', '/wp-admin', '/backup', '/admin/backup',
                    '.env', 'package.json', '.map', 'node_modules']
@@ -21,16 +18,27 @@ HONEYPOT_PATHS = ['/admin', '/wp-admin', '/backup', '/admin/backup',
 THREAT_LOG_FILE = Path("backups/threat_log.json")
 IP_BLOCKLIST = {}  # {ip: datetime_until_unblock}
 
+def _is_real_browser(ua: str) -> bool:
+    """
+    ALLOWLIST approach: only pass requests that look like a real browser.
+    Must have 'Mozilla' AND one of the known browser tokens.
+    Everything else — AI tools, scrapers, curl, bots — gets the decoy page.
+    """
+    if not ua:
+        return False
+    ua_lower = ua.lower()
+    has_mozilla = 'mozilla' in ua_lower
+    has_browser = any(t in ua_lower for t in ALLOWED_UA_TOKENS)
+    return has_mozilla and has_browser
+
+# Keep for backwards compat — now unused but imported in app.py
 def _is_bot_user_agent(ua: str) -> bool:
-    """Check if user agent matches known bot patterns."""
-    ua_lower = ua.lower() if ua else ""
-    return any(bot in ua_lower for bot in BOT_USER_AGENTS)
+    return not _is_real_browser(ua)
 
 def _is_headless_browser(ua: str) -> bool:
-    """Detect headless browser signatures."""
-    headless_sigs = ['headless', 'phantom', 'puppet', 'playwright', 'selenium']
+    headless = ['headlesschrome', 'phantomjs', 'puppeteer', 'playwright', 'selenium']
     ua_lower = ua.lower() if ua else ""
-    return any(sig in ua_lower for sig in headless_sigs)
+    return any(h in ua_lower for h in headless)
 
 def _log_threat(ip: str, threat_type: str, ua: str):
     """Log suspicious request to threat log."""

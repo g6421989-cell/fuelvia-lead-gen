@@ -391,23 +391,35 @@ def _auth() -> bool:
 
 @app.before_request
 def security_check():
-    """Check for bot signatures before processing request."""
-    ip = request.remote_addr
-    ua = request.headers.get('User-Agent', '')
+    """
+    ALLOWLIST approach: only real browsers with Mozilla + browser token pass.
+    Everything else — AI tools, curl, scrapers, headless browsers — gets decoy.
+    API endpoints (/api/*) are exempt from UA check so AJAX still works.
+    """
+    from security import _is_real_browser, _log_threat, _get_decoy_page
+
+    ip   = request.remote_addr
+    ua   = request.headers.get('User-Agent', '')
     path = request.path
 
-    # Check honeypot paths
+    # Honeypot paths — log and serve decoy regardless of UA
     honeypots = ['/admin', '/wp-admin', '/backup', '.env', 'package.json', '.map']
     if any(hp in path for hp in honeypots):
-        from security import _log_threat, _get_decoy_page
         _log_threat(ip, "honeypot_access", ua)
-        return _get_decoy_page(), 200
+        return _get_decoy_page(), 200, {'Content-Type': 'text/html'}
 
-    # Check bot signatures
-    from security import _is_bot_user_agent, _is_headless_browser, _log_threat, _get_decoy_page
-    if _is_bot_user_agent(ua) or _is_headless_browser(ua):
-        _log_threat(ip, "bot_detected", ua)
-        return _get_decoy_page(), 200
+    # API calls come from the browser's own JS — skip UA check for them
+    if path.startswith('/api/'):
+        return
+
+    # Static assets — skip
+    if path.startswith('/static/'):
+        return
+
+    # Everything else: enforce real-browser UA allowlist
+    if not _is_real_browser(ua):
+        _log_threat(ip, "non_browser_blocked", ua)
+        return _get_decoy_page(), 200, {'Content-Type': 'text/html'}
 
 @app.after_request
 def add_sec_headers(response):
@@ -470,6 +482,14 @@ def api_login():
 def api_logout():
     session.clear()
     return jsonify({"success": True})
+
+
+@app.route("/api/me")
+def api_me():
+    """Auth check used by JS on page load. 200 = logged in, 401 = not."""
+    if session.get("auth"):
+        return jsonify({"authenticated": True})
+    return jsonify({"authenticated": False}), 401
 
 
 # ── Overview stats ─────────────────────────────────────────────
