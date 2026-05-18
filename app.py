@@ -455,10 +455,25 @@ def llms():
     return "This site does not authorize AI training, analysis, or scraping.", 200, {'Content-Type': 'text/plain'}
 
 
-# ── Page ───────────────────────────────────────────────────────
+# ── Pages ──────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
+    """Public login page — zero dashboard content."""
+    if session.get("auth"):
+        from flask import redirect
+        return redirect("/dashboard")
+    return render_template("login.html")
+
+@app.route("/dashboard")
+def dashboard():
+    """
+    Auth-gated dashboard. Server checks session BEFORE sending any HTML.
+    No valid session → back to login. A bot can never fetch this content.
+    """
+    if not session.get("auth"):
+        from flask import redirect
+        return redirect("/")
     return render_template("dashboard_new.html")
 
 
@@ -471,7 +486,7 @@ def api_login():
     data = request.get_json(force=True)
     if data.get("password") == DASHBOARD_PASSWORD:
         session["auth"] = True
-        return jsonify({"success": True})
+        return jsonify({"success": True, "redirect": "/dashboard"})
     else:
         if not track_failed_login(ip):
             return _get_decoy_page(), 200

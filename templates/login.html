@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<title>Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;display:flex;align-items:center;justify-content:center;height:100vh}
+</style>
+</head>
+<body>
+<div id="r"></div>
+<script>
+(function(){
+var d=document,r=d.getElementById('r');
+// Build styles
+var s=d.createElement('style');
+s.textContent='.b{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:48px 40px;width:360px;text-align:center}.l{font-size:22px;font-weight:700;color:#0a0a0a;margin-bottom:32px;letter-spacing:-0.3px}input{width:100%;padding:11px 14px;border:1px solid #d4d4d4;border-radius:6px;font-size:14px;margin-bottom:12px;outline:none;transition:border-color .15s}input:focus{border-color:#0a0a0a}.ab{width:100%;padding:11px;background:#0a0a0a;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}.ab:hover{background:#1a1a1a}.e{color:#7b2d2d;font-size:12px;margin-bottom:10px;min-height:16px}.sp{display:none;width:18px;height:18px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:rr 0.7s linear infinite;margin:0 auto}@keyframes rr{to{transform:rotate(360deg)}}';
+d.head.appendChild(s);
+// Build DOM
+var box=d.createElement('div'); box.className='b';
+var logo=d.createElement('div'); logo.className='l'; logo.textContent=atob('RGFzaGJvYXJk');
+var pw=d.createElement('input'); pw.type='password'; pw.id='pw'; pw.placeholder=atob('UGFzc3dvcmQ='); pw.setAttribute('autocomplete','current-password');
+var err=d.createElement('div'); err.className='e'; err.id='er';
+var btn=d.createElement('button'); btn.className='ab'; btn.id='bn';
+var bt=d.createElement('span'); bt.id='bt'; bt.textContent=atob('Q29udGludWU=');
+var sp=d.createElement('div'); sp.className='sp'; sp.id='sp';
+btn.appendChild(bt); btn.appendChild(sp);
+box.appendChild(logo); box.appendChild(pw); box.appendChild(err); box.appendChild(btn);
+r.appendChild(box);
+// Logic
+function go(){
+  var v=pw.value; if(!v)return;
+  bt.style.display='none'; sp.style.display='block'; err.textContent='';
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:v})})
+  .then(function(res){return res.json();})
+  .then(function(j){
+    if(j.success){window.location.href=j.redirect||'/dashboard';}
+    else{err.textContent=atob('SW5jb3JyZWN0IHBhc3N3b3Jk');bt.style.display='';sp.style.display='none';}
+  })
+  .catch(function(){err.textContent=atob('Q29ubmVjdGlvbiBlcnJvcg==');bt.style.display='';sp.style.display='none';});
+}
+pw.addEventListener('keydown',function(e){if(e.key==='Enter')go();});
+btn.addEventListener('click',go);
+})();
+</script>
+</body>
+</html>
