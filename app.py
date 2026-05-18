@@ -387,6 +387,62 @@ def _auth() -> bool:
     return True  # Password removed — open access
 
 
+# ── SECURITY: Bot Detection, Headers, Robots/LLMs ─────────────────────────────
+
+@app.before_request
+def security_check():
+    """Check for bot signatures before processing request."""
+    ip = request.remote_addr
+    ua = request.headers.get('User-Agent', '')
+    path = request.path
+
+    # Check honeypot paths
+    honeypots = ['/admin', '/wp-admin', '/backup', '.env', 'package.json', '.map']
+    if any(hp in path for hp in honeypots):
+        from security import _log_threat, _get_decoy_page
+        _log_threat(ip, "honeypot_access", ua)
+        return _get_decoy_page(), 200
+
+    # Check bot signatures
+    from security import _is_bot_user_agent, _is_headless_browser, _log_threat, _get_decoy_page
+    if _is_bot_user_agent(ua) or _is_headless_browser(ua):
+        _log_threat(ip, "bot_detected", ua)
+        return _get_decoy_page(), 200
+
+@app.after_request
+def add_sec_headers(response):
+    """Add hardening headers to all responses."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    response.headers['Server'] = 'nginx'
+    if 'X-Powered-By' in response.headers:
+        del response.headers['X-Powered-By']
+    return response
+
+@app.route('/robots.txt')
+def robots():
+    """Block all bots via robots.txt."""
+    return """User-agent: *
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+""", 200, {'Content-Type': 'text/plain'}
+
+@app.route('/.well-known/llms.txt')
+def llms():
+    """LLM crawling policy."""
+    return "This site does not authorize AI training, analysis, or scraping.", 200, {'Content-Type': 'text/plain'}
+
+
 # ── Page ───────────────────────────────────────────────────────
 
 @app.route("/")
@@ -398,10 +454,15 @@ def index():
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
+    from security import track_failed_login, _get_decoy_page
+    ip = request.remote_addr
     data = request.get_json(force=True)
     if data.get("password") == DASHBOARD_PASSWORD:
         session["auth"] = True
         return jsonify({"success": True})
+    else:
+        if not track_failed_login(ip):
+            return _get_decoy_page(), 200
     return jsonify({"success": False, "error": "Wrong password"}), 401
 
 
@@ -1421,6 +1482,28 @@ def api_campaign_history():
         return jsonify({"campaigns": campaigns})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── ERROR HANDLERS (no stack trace leaks) ──────────────────────
+
+@app.errorhandler(404)
+def handle_404(e):
+    """Serve decoy page on 404."""
+    from security import _get_decoy_page
+    return _get_decoy_page(), 200
+
+@app.errorhandler(500)
+def handle_500(e):
+    """Log error internally, return generic response."""
+    import traceback
+    print(f"[ERROR 500] {traceback.format_exc()}")
+    return jsonify({"error": "Something went wrong"}), 500
+
+@app.errorhandler(403)
+def handle_403(e):
+    """Forbidden — serve decoy."""
+    from security import _get_decoy_page
+    return _get_decoy_page(), 200
 
 
 # ── Entry point ────────────────────────────────────────────────
