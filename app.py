@@ -194,7 +194,8 @@ def _get_founder_name(email: str) -> str:
     return founder_name.capitalize()    # Capitalize first letter
 
 
-def _smtp_send(account: dict, to_email: str, subject: str, body: str) -> bool:
+def _smtp_send(account: dict, to_email: str, subject: str, body: str) -> tuple:
+    """Returns (success: bool, error_msg: str)."""
     msg = MIMEMultipart()
     # ── Use founder name from email address ──
     founder_name = _get_founder_name(account["email"])
@@ -203,14 +204,15 @@ def _smtp_send(account: dict, to_email: str, subject: str, body: str) -> bool:
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
     try:
-        with smtplib.SMTP(account["smtp_server"], account["smtp_port"]) as srv:
+        with smtplib.SMTP(account["smtp_server"], account["smtp_port"], timeout=30) as srv:
             srv.starttls()
             srv.login(account["email"], account["password"])
             srv.sendmail(account["email"], to_email, msg.as_string())
-        return True
+        return True, ""
     except Exception as e:
-        print(f"  [SMTP] Error sending to {to_email}: {e}")
-        return False
+        err = str(e)
+        print(f"  [SMTP] Error sending to {to_email}: {err}")
+        return False, err
 
 
 # ── YouTube re-fetch helper ────────────────────────────────────
@@ -924,7 +926,7 @@ def _run_send_emails():
             return
 
         _alog(f"[{_ts()}]    [{i}/{total}] Sending to {email} via {account['email']}…")
-        ok = _smtp_send(account, email, subject, body)
+        ok, smtp_err = _smtp_send(account, email, subject, body)
 
         if ok:
             # ── Status update FIRST — this is the critical guard ──
@@ -976,7 +978,7 @@ def _run_send_emails():
                     time.sleep(0.5)
                 _alog(f"[{_ts()}] ✅ 2-minute cooldown complete — ready to send next email")
         else:
-            _alog(f"[{_ts()}] ❌ SMTP failed for {email}")
+            _alog(f"[{_ts()}] ❌ SMTP failed for {email}: {smtp_err}")
 
     _alog(f"[{_ts()}] 🏁 Done!  {sent}/{total} cold emails sent.")
     with _email_action_lock:
@@ -1077,7 +1079,7 @@ def _run_send_followup():
                 continue   # skip this lead today; don't abort the whole run
 
             _alog(f"[{_ts()}]    [{i}/{total}] Sending follow-up to {email} via {account['email']}…")
-            ok = _smtp_send(account, email, subject, body)
+            ok, smtp_err = _smtp_send(account, email, subject, body)
 
             if ok:
                 notion.mark_followup1_sent(lead["id"])
@@ -1109,7 +1111,7 @@ def _run_send_followup():
                         time.sleep(0.5)
                     _alog(f"[{_ts()}] ✅ 2-minute cooldown complete — ready to send next follow-up")
             else:
-                _alog(f"[{_ts()}] ❌ SMTP failed for {email}")
+                _alog(f"[{_ts()}] ❌ SMTP failed for {email}: {smtp_err}")
 
         _alog(f"[{_ts()}] 🏁 Done!  {sent}/{total} follow-ups sent.")
         with _email_action_lock:
