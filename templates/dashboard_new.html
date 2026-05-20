@@ -450,6 +450,16 @@
 <script>
 var _overviewChart=null,_analyticsChart=null,_previewLeadId=null,_analyticsDataCache=null;
 
+// ── Toast (replaces all alert/confirm popups) ──────────────
+function _toast(msg,type){
+    var t=document.createElement('div');
+    var bg=type==='error'?'#7b2d2d':type==='warn'?'#5a4a1a':'#1a3a2a';
+    t.style.cssText='position:fixed;top:18px;right:18px;z-index:99999;background:'+bg+';color:#f0ece4;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:opacity 0.4s;';
+    t.textContent=msg;
+    document.body.appendChild(t);
+    setTimeout(function(){t.style.opacity='0';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},400);},3500);
+}
+
 // Clock
 setInterval(function(){var el=document.getElementById('current-time');if(el)el.textContent=new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});},1000);
 
@@ -632,15 +642,15 @@ function startScrape(){
         city_drill_key=document.getElementById('scraper-city-drill').value,
         use_fresh_keywords=document.getElementById('scraper-fresh-kw').checked;
     var date_filter_days=date_filter_raw?parseInt(date_filter_raw):null;
-    if(max_leads>30){alert('Maximum 30 leads per search.');return;}
-    if(max_leads<1){alert('Enter at least 1.');return;}
+    if(max_leads>30){_toast('Maximum 30 leads per search.','warn');return;}
+    if(max_leads<1){_toast('Enter at least 1 lead.','warn');return;}
     document.getElementById('btn-start').classList.add('hidden');
     document.getElementById('btn-pause').classList.remove('hidden');
     document.getElementById('btn-stop').classList.remove('hidden');
     var payload={niche:niche,location:location,sub_range:sub_range,max_leads:max_leads,
         date_filter_days:date_filter_days,city_drill_key:city_drill_key,use_fresh_keywords:use_fresh_keywords};
     fetch('/api/start-scrape',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-    .then(function(r){return r.json();}).then(function(d){if(!d.success){alert('Failed: '+(d.error||'Unknown'));document.getElementById('btn-start').classList.remove('hidden');document.getElementById('btn-pause').classList.add('hidden');document.getElementById('btn-stop').classList.add('hidden');}});
+    .then(function(r){return r.json();}).then(function(d){if(!d.success){_toast('Scrape failed: '+(d.error||'Unknown'),'error');document.getElementById('btn-start').classList.remove('hidden');document.getElementById('btn-pause').classList.add('hidden');document.getElementById('btn-stop').classList.add('hidden');}});
     updateScraperStatus();
 }
 
@@ -693,10 +703,10 @@ function _openOutreachTab(label){
     document.getElementById('btn-stop-action').classList.remove('hidden');
 }
 
-function runSendEmails(){if(!confirm('Send cold emails to all "New" leads?'))return;fetch('/api/send-emails',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){alert('Error: '+d.error);return;}_setSidebarBtnActive('sbtn-send-emails');_openOutreachTab('Send Emails');});}
-function runSendFollowup(){if(!confirm('Send follow-ups to all "Contacted" leads?'))return;fetch('/api/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){alert('Error: '+d.error);return;}_setSidebarBtnActive('sbtn-send-followup');_openOutreachTab('Send Follow-ups');});}
-function runCheckReplies(){fetch('/api/check-replies',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){alert('Error: '+d.error);return;}_setSidebarBtnActive('sbtn-check-replies');_openOutreachTab('Check Replies');});}
-function stopEmailAction(){fetch('/api/stop-email-action',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(!d.success)alert('Could not stop');document.getElementById('btn-stop-action').classList.add('hidden');});}
+function runSendEmails(){fetch('/api/send-emails',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-emails');_openOutreachTab('Send Emails');});}
+function runSendFollowup(){fetch('/api/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-followup');_openOutreachTab('Send Follow-ups');});}
+function runCheckReplies(){fetch('/api/check-replies',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-check-replies');_openOutreachTab('Check Replies');});}
+function stopEmailAction(){fetch('/api/stop-email-action',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(!d.success)_toast('Could not stop action','error');document.getElementById('btn-stop-action').classList.add('hidden');});}
 
 function updateOutreachStatus(){
     fetch('/api/email-action-status').then(function(r){return r.json();}).then(function(d){
