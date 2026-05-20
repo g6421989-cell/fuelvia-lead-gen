@@ -415,10 +415,8 @@ def scrape_leads(
                 }
                 if next_page:
                     params["pageToken"] = next_page
-                # Solution 3: date filter on channel search
-                if published_after:
-                    params["publishedBefore"] = None  # not supported on channel search
-                    # Date filter applied in Phase B video search instead
+                # Note: publishedAfter is not supported on channel-type search.
+                # Date filter (Solution 3) is applied in Phase B video search instead.
 
                 resp  = youtube.search().list(**params).execute()
                 items = resp.get("items", [])

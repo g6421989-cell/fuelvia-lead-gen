@@ -669,18 +669,24 @@ def _run_scraper(
     city_drill_key: str = None,
     use_fresh_keywords: bool = True,
 ):
-    _log(f"[{_ts()}] ▷ Starting — niche={niche} | loc={location} | range={sub_range} | target={max_leads}")
-    if date_filter_days:
-        _log(f"[{_ts()}] 📅 Date filter: last {date_filter_days} days")
-    if city_drill_key and city_drill_key != "Disabled":
-        _log(f"[{_ts()}] 🏙 City drilling: {city_drill_key}")
-    if use_fresh_keywords:
-        _log(f"[{_ts()}] 🔄 Smart keyword rotation: ON")
-    with _state_lock:
-        _scrape_state.update({"status": "running", "progress": 0, "leads_found": 0, "total": int(max_leads)})
-
-    _ICONS = {"success":"✅","warning":"⚠","error":"❌","info":"  ","progress":"📊","complete":"🏁"}
+    import traceback as _tb
     try:
+        _log(f"[{_ts()}] ▷ Starting — niche={niche} | loc={location} | range={sub_range} | target={max_leads}")
+        if date_filter_days:
+            _log(f"[{_ts()}] 📅 Date filter: last {date_filter_days} days")
+        if city_drill_key and city_drill_key != "Disabled":
+            _log(f"[{_ts()}] 🏙 City drilling: {city_drill_key}")
+        if use_fresh_keywords:
+            _log(f"[{_ts()}] 🔄 Smart keyword rotation: ON")
+
+        from config import YOUTUBE_APIS as _yt_keys
+        _log(f"[{_ts()}]    YouTube API keys loaded: {len(_yt_keys)}")
+        if not _yt_keys:
+            _log(f"[{_ts()}] ❌ NO YOUTUBE API KEYS — add YOUTUBE_API_1 to environment variables")
+            with _state_lock: _scrape_state["status"] = "error"
+            return
+
+        _ICONS = {"success":"✅","warning":"⚠","error":"❌","info":"  ","progress":"📊","complete":"🏁"}
         for event in scrape_leads(
             niche, location, sub_range, max_leads,
             date_filter_days=date_filter_days,
@@ -719,7 +725,9 @@ def _run_scraper(
                 _scrape_state["status"]   = "completed"
                 _scrape_state["progress"] = 100
     except Exception as exc:
+        tb = _tb.format_exc()
         _log(f"[{_ts()}] ❌ FATAL ERROR: {exc}")
+        _log(f"[{_ts()}] ❌ Traceback: {tb[-600:]}")
         with _state_lock: _scrape_state["status"] = "error"
 
 
@@ -768,8 +776,12 @@ def api_start_scrape():
         daemon=True,
     )
     with _state_lock:
-        _scrape_state["thread"] = t
-        _scrape_state["logs"]   = []
+        _scrape_state["thread"]     = t
+        _scrape_state["logs"]       = []
+        _scrape_state["status"]     = "running"   # set BEFORE thread starts so UI is instant
+        _scrape_state["progress"]   = 0
+        _scrape_state["leads_found"] = 0
+        _scrape_state["total"]      = max_leads
     t.start()
     return jsonify({"success": True})
 
@@ -810,6 +822,56 @@ def api_scrape_status():
             "total":       _scrape_state["total"],
             "logs":        list(_scrape_state["logs"]),
         })
+
+
+@app.route("/api/scraper-test")
+def api_scraper_test():
+    """Diagnostic: confirm config, imports, and YouTube key count. Open in browser to debug IDLE issue."""
+    import traceback as _tb
+    results = {}
+    try:
+        from config import YOUTUBE_APIS as _yt
+        results["youtube_keys"] = len(_yt)
+        results["youtube_keys_set"] = [k[:8]+"..." for k in _yt] if _yt else []
+    except Exception as e:
+        results["youtube_keys_error"] = str(e)
+
+    try:
+        from config import NOTION_API_KEY, NOTION_DATABASE_ID
+        results["notion_key_set"] = bool(NOTION_API_KEY)
+        results["notion_db_set"]  = bool(NOTION_DATABASE_ID)
+    except Exception as e:
+        results["notion_error"] = str(e)
+
+    try:
+        from config import ANTHROPIC_API_KEY
+        results["claude_key_set"] = bool(ANTHROPIC_API_KEY)
+    except Exception as e:
+        results["claude_error"] = str(e)
+
+    try:
+        import scraper_engine
+        results["scraper_engine_import"] = "OK"
+    except Exception as e:
+        results["scraper_engine_import"] = f"FAILED: {_tb.format_exc()[-400:]}"
+
+    try:
+        import search_tokens
+        results["search_tokens_import"] = "OK"
+    except Exception as e:
+        results["search_tokens_import"] = f"FAILED: {str(e)}"
+
+    try:
+        from config import NICHE_OPTIONS, LOCATION_OPTIONS, SUBSCRIBER_RANGES
+        results["niche_options_count"]    = len(NICHE_OPTIONS)
+        results["location_options_count"] = len(LOCATION_OPTIONS)
+        results["sub_range_options_count"]= len(SUBSCRIBER_RANGES)
+    except Exception as e:
+        results["options_error"] = str(e)
+
+    results["scrape_state_status"] = _scrape_state.get("status", "unknown")
+    results["email_accounts"]      = len(OUTREACH_ACCOUNTS)
+    return jsonify(results)
 
 
 # ══════════════════════════════════════════════════════════════
