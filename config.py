@@ -113,7 +113,7 @@ REPORTING_ACCOUNT = {
 }
 
 # ── System settings ───────────────────────────────────────────────────
-EMAIL_ROTATION_DELAY = 120
+EMAIL_ROTATION_DELAY = 600  # 10 minutes between emails
 DAILY_REPORT_TIME    = "17:00"
 CALENDAR_LINK        = "https://calendly.com/fuelvia-co/30min?month=2026-05"
 SENDER_NAME          = "Jashan A."
