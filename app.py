@@ -1560,9 +1560,9 @@ def api_activity_crm():
         replies.sort(key=lambda x: x["reply_date"], reverse=True)
 
         return jsonify({
-            "sent_emails": sent_emails[:100],
-            "followups":   followups[:100],
-            "replies":     replies[:100],
+            "sent_emails": sent_emails[:50],
+            "followups":   followups[:50],
+            "replies":     replies[:50],
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
