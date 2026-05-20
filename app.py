@@ -73,32 +73,52 @@ DASHBOARD_PASSWORD = "fuelvia2025"
 ADMIN_KEY          = "FuelVia_Admin_2026_SecureRemote_Key_xyz789abc123def"
 
 
-# ── Load email config from environment or JSON ────────────────────────────────
+# ── Load email config (3-tier fallback) ───────────────────────────────────────
 def _load_email_config():
-    """Load email accounts from environment variable or fallback to email_config.json"""
+    """
+    Load outreach accounts in priority order:
+      1. EMAIL_CONFIG env var (JSON string) — for Render/cloud deployment
+      2. email_config.json file             — for local development
+      3. OUTREACH_ACCOUNTS in config.py     — hardcoded fallback (always works)
+    """
+    # Tier 1: env var
     email_config_env = os.getenv("EMAIL_CONFIG")
     if email_config_env:
         try:
-            config = json.loads(email_config_env)
-            return config.get("outreach_emails", [])
+            cfg = json.loads(email_config_env)
+            accts = cfg.get("outreach_emails", [])
+            if accts:
+                print(f"[OK] Email accounts loaded from EMAIL_CONFIG env var ({len(accts)})")
+                return accts
         except Exception as e:
             print(f"WARNING: Could not parse EMAIL_CONFIG env var: {e}")
 
-    # Fallback to JSON file for local development
+    # Tier 2: JSON file
     config_path = os.path.join(os.path.dirname(__file__), "email_config.json")
     try:
         with open(config_path, "r") as f:
-            config = json.load(f)
-        return config.get("outreach_emails", [])
+            cfg = json.load(f)
+        accts = cfg.get("outreach_emails", [])
+        if accts:
+            print(f"[OK] Email accounts loaded from email_config.json ({len(accts)})")
+            return accts
+    except Exception:
+        pass  # file not present — try next tier
+
+    # Tier 3: hardcoded in config.py (always available, even on Render)
+    try:
+        from config import OUTREACH_ACCOUNTS as _cfg_accts
+        if _cfg_accts:
+            print(f"[OK] Email accounts loaded from config.py ({len(_cfg_accts)})")
+            return list(_cfg_accts)
     except Exception as e:
-        print(f"WARNING: Could not load email_config.json: {e}")
-        return []
+        print(f"WARNING: Could not load accounts from config.py: {e}")
+
+    print("WARNING: No outreach accounts found in any source")
+    return []
 
 OUTREACH_ACCOUNTS = _load_email_config()
-if not OUTREACH_ACCOUNTS:
-    print("WARNING: No outreach accounts loaded (EMAIL_CONFIG env or email_config.json)")
-else:
-    print(f"[OK] Loaded {len(OUTREACH_ACCOUNTS)} email accounts")
+if OUTREACH_ACCOUNTS:
     for acc in OUTREACH_ACCOUNTS:
         print(f"     • {acc['email']}")
 
@@ -195,24 +215,49 @@ def _get_founder_name(email: str) -> str:
 
 
 def _smtp_send(account: dict, to_email: str, subject: str, body: str) -> tuple:
-    """Returns (success: bool, error_msg: str)."""
+    """
+    Returns (success: bool, error_msg: str).
+    Tries STARTTLS on configured port first, then falls back to SSL on port 465.
+    This handles cloud platforms (like Render) that block port 587.
+    """
     msg = MIMEMultipart()
-    # ── Use founder name from email address ──
     founder_name = _get_founder_name(account["email"])
     msg["From"]    = f"{founder_name} - {COMPANY_NAME} <{account['email']}>"
     msg["To"]      = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
+    raw = msg.as_string()
+
+    errors = []
+
+    # ── Attempt 1: STARTTLS on configured port (587) ──────────────
     try:
         with smtplib.SMTP(account["smtp_server"], account["smtp_port"], timeout=30) as srv:
+            srv.ehlo()
             srv.starttls()
+            srv.ehlo()
             srv.login(account["email"], account["password"])
-            srv.sendmail(account["email"], to_email, msg.as_string())
+            srv.sendmail(account["email"], to_email, raw)
         return True, ""
     except Exception as e:
-        err = str(e)
-        print(f"  [SMTP] Error sending to {to_email}: {err}")
-        return False, err
+        errors.append(f"STARTTLS port {account['smtp_port']}: {e}")
+
+    # ── Attempt 2: SSL on port 465 (Render / cloud fallback) ──────
+    ssl_port = 465
+    if account["smtp_port"] != ssl_port:
+        try:
+            import ssl as _ssl
+            ctx = _ssl.create_default_context()
+            with smtplib.SMTP_SSL(account["smtp_server"], ssl_port, timeout=30, context=ctx) as srv:
+                srv.login(account["email"], account["password"])
+                srv.sendmail(account["email"], to_email, raw)
+            return True, ""
+        except Exception as e:
+            errors.append(f"SSL port {ssl_port}: {e}")
+
+    err = " | ".join(errors)
+    print(f"  [SMTP] All send attempts failed for {to_email}: {err}")
+    return False, err
 
 
 # ── YouTube re-fetch helper ────────────────────────────────────
@@ -824,54 +869,65 @@ def api_scrape_status():
         })
 
 
-@app.route("/api/scraper-test")
-def api_scraper_test():
-    """Diagnostic: confirm config, imports, and YouTube key count. Open in browser to debug IDLE issue."""
+@app.route("/api/health")
+def api_health():
+    """System health page — open in browser to verify all config is set correctly."""
     import traceback as _tb
-    results = {}
+    checks = []
+
+    def row(label, ok, detail=""):
+        icon = "✅" if ok else "❌"
+        return f"<tr><td>{icon}</td><td><b>{label}</b></td><td style='color:#888'>{detail}</td></tr>"
+
+    # YouTube API keys
     try:
         from config import YOUTUBE_APIS as _yt
-        results["youtube_keys"] = len(_yt)
-        results["youtube_keys_set"] = [k[:8]+"..." for k in _yt] if _yt else []
+        n = len(_yt)
+        checks.append(row("YouTube API Keys", n > 0,
+            f"{n} key(s) loaded" if n > 0 else "MISSING — add YOUTUBE_API_1 … in Render env vars"))
     except Exception as e:
-        results["youtube_keys_error"] = str(e)
+        checks.append(row("YouTube API Keys", False, str(e)))
 
+    # Notion
     try:
         from config import NOTION_API_KEY, NOTION_DATABASE_ID
-        results["notion_key_set"] = bool(NOTION_API_KEY)
-        results["notion_db_set"]  = bool(NOTION_DATABASE_ID)
+        checks.append(row("Notion API Key",     bool(NOTION_API_KEY),     "set ✓" if NOTION_API_KEY else "MISSING"))
+        checks.append(row("Notion Database ID", bool(NOTION_DATABASE_ID), "set ✓" if NOTION_DATABASE_ID else "MISSING"))
     except Exception as e:
-        results["notion_error"] = str(e)
+        checks.append(row("Notion", False, str(e)))
 
+    # Claude
     try:
         from config import ANTHROPIC_API_KEY
-        results["claude_key_set"] = bool(ANTHROPIC_API_KEY)
+        checks.append(row("Claude API Key", bool(ANTHROPIC_API_KEY), "set ✓" if ANTHROPIC_API_KEY else "MISSING (email still uses fallback templates)"))
     except Exception as e:
-        results["claude_error"] = str(e)
+        checks.append(row("Claude API Key", False, str(e)))
 
-    try:
-        import scraper_engine
-        results["scraper_engine_import"] = "OK"
-    except Exception as e:
-        results["scraper_engine_import"] = f"FAILED: {_tb.format_exc()[-400:]}"
+    # Email accounts
+    checks.append(row("Email Accounts", len(OUTREACH_ACCOUNTS) > 0,
+        f"{len(OUTREACH_ACCOUNTS)} account(s) loaded" if OUTREACH_ACCOUNTS
+        else "MISSING — add EMAIL_CONFIG env var or email_config.json"))
 
-    try:
-        import search_tokens
-        results["search_tokens_import"] = "OK"
-    except Exception as e:
-        results["search_tokens_import"] = f"FAILED: {str(e)}"
+    # Imports
+    for mod in ["scraper_engine", "search_tokens", "notion_manager",
+                "channel_qualifier", "channel_blacklist", "daily_send_limit"]:
+        try:
+            __import__(mod)
+            checks.append(row(f"import {mod}", True, "OK"))
+        except Exception as e:
+            checks.append(row(f"import {mod}", False, _tb.format_exc()[-200:]))
 
-    try:
-        from config import NICHE_OPTIONS, LOCATION_OPTIONS, SUBSCRIBER_RANGES
-        results["niche_options_count"]    = len(NICHE_OPTIONS)
-        results["location_options_count"] = len(LOCATION_OPTIONS)
-        results["sub_range_options_count"]= len(SUBSCRIBER_RANGES)
-    except Exception as e:
-        results["options_error"] = str(e)
-
-    results["scrape_state_status"] = _scrape_state.get("status", "unknown")
-    results["email_accounts"]      = len(OUTREACH_ACCOUNTS)
-    return jsonify(results)
+    rows_html = "\n".join(checks)
+    html = f"""<!DOCTYPE html><html><head><title>Fuelvia Health</title>
+<style>body{{font-family:monospace;background:#0a0a0a;color:#d4d4d4;padding:40px}}
+table{{border-collapse:collapse;width:600px}}td{{padding:8px 12px;border-bottom:1px solid #222}}
+h1{{color:#fff;margin-bottom:24px}}</style></head><body>
+<h1>🔧 Fuelvia System Health</h1>
+<table>{rows_html}</table>
+<p style="margin-top:24px;color:#555;font-size:12px">Scrape status: {_scrape_state.get('status','idle')} &nbsp;|&nbsp;
+Email accounts: {len(OUTREACH_ACCOUNTS)}</p>
+</body></html>"""
+    return html, 200, {"Content-Type": "text/html"}
 
 
 # ══════════════════════════════════════════════════════════════

@@ -413,8 +413,11 @@
                     <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
                 </div>
                 <div class="mt-24">
-                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mid);margin-bottom:12px;">Activity Log</div>
-                    <div class="logs-box" id="scraper-logs"><div class="log-entry">Waiting…</div></div>
+                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mid);margin-bottom:12px;display:flex;align-items:center;gap:12px;">
+                        Activity Log
+                        <a href="/api/health" target="_blank" style="font-size:10px;color:#555;text-decoration:none;font-weight:400;letter-spacing:0;text-transform:none;border:1px solid #333;border-radius:3px;padding:2px 7px;">⚙ System Health</a>
+                    </div>
+                    <div class="logs-box" id="scraper-logs"><div class="log-entry" style="color:#555;">Ready — select niche, location, and range, then click ▷ Start.</div></div>
                 </div>
             </div>
         </div>
@@ -681,7 +684,14 @@ function updateScraperStatus(){
         if(status==='paused')document.getElementById('btn-pause').textContent='Resume';
         if(status==='running')document.getElementById('btn-pause').textContent='⏸ Pause';
         var logs=document.getElementById('scraper-logs');
-        if(d.logs&&d.logs.length){logs.innerHTML=d.logs.map(function(log){var cls=log.includes('✅')||log.includes('QUALIFIED')?'log-ok':log.includes('❌')||log.includes('STOPPED')?'log-err':log.includes('⚠')||log.includes('limit')?'log-warn':log.includes('🏁')?'log-done':'';return'<div class="log-entry '+cls+'">'+log+'</div>';}).join('');logs.scrollTop=logs.scrollHeight;}
+        if(d.logs&&d.logs.length){
+            logs.innerHTML=d.logs.map(function(log){var cls=log.includes('✅')||log.includes('QUALIFIED')?'log-ok':log.includes('❌')||log.includes('STOPPED')?'log-err':log.includes('⚠')||log.includes('limit')?'log-warn':log.includes('🏁')?'log-done':'';return'<div class="log-entry '+cls+'">'+log+'</div>';}).join('');
+            logs.scrollTop=logs.scrollHeight;
+        } else if(status==='idle'){
+            logs.innerHTML='<div class="log-entry" style="color:#555;">Ready — select niche, location, and range, then click ▷ Start.</div>';
+        } else if(status==='running'){
+            logs.innerHTML='<div class="log-entry" style="color:#888;">Starting scraper… logs will appear here shortly.</div>';
+        }
     }).catch(function(){});
 }
 
