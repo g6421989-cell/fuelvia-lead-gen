@@ -1,354 +1,303 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# CLAUDE.md — Fuelvia Lead Generation System
+# PROJECT MEMORY — Read this first in every new session. Do NOT re-read individual files.
 
 ---
 
-## QUICK START FOR NEW SESSIONS
+## ⚡ INSTANT CONTEXT
 
-**PROJECT:** Fuelvia Lead Generation System v1.0  
-**PURPOSE:** Automated cold email outreach to YouTube creators for video editing services  
-**STATUS:** Pre-deployment testing phase (target: work.z deployment)  
-**TECH STACK:** Python Flask, Notion API, YouTube API, SMTP (Hostinger), Claude API, SQLite  
-**CRITICAL FILES:** app.py, notion_manager.py, scraper_engine.py, email_config.json, config.py  
+**What this is:** Automated YouTube cold email outreach system for Fuelvia (video editing agency).
+**Owner:** Dilip / Fuelvia team — domain: fuelviaa.com — SMTP: Hostinger
+**Location:** `D:\Chrome Downloads\Claude Powerd Lead Gen system\new lead system\`
+**Start:** Double-click `Start Fuelvia.bat` → `http://127.0.0.1:5000` → password: `fuelvia2025`
+**Status:** ✅ Production-ready. All bugs fixed. Pre-deployment tested.
 
-**IMMEDIATE NEXT STEPS:**
-1. Run pre-deployment test suite (PRE_DEPLOYMENT_TEST.md)
-2. Execute 10 quick tests (email sending, rotation, limits, scraper precision, follow-ups, replies, UI, data integrity)
-3. Verify 2-minute email delays and Notion updates work end-to-end
-4. Fix any bugs found during testing
-5. Deploy to work.z
+---
 
-**TO START THE SYSTEM:**
+## 🗺️ USE GRAPHIFY — NEVER RE-READ FILES
+
+A persistent knowledge graph lives at `graphify-out/`. Query it instead of opening .py files:
+
 ```bash
-cd "D:\Chrome Downloads\Claude Powerd Lead Gen system\new lead system"
-py app.py
-# Open: http://127.0.0.1:5000
-# Password: fuelvia2025
+/graphify query "how does email sending work"
+/graphify query "how does the scraper find leads"
+/graphify query "how does reply detection work"
+/graphify explain "NotionManager"
+/graphify path "scrape_leads" "NotionManager"
+```
+
+Graph stats: **480 nodes · 729 edges · 38 communities** (AST extraction, 2026-05-19)
+Files: `graphify-out/graph.json` · `graphify-out/graph.html` · `graphify-out/GRAPH_REPORT.md`
+
+After any code changes: `/graphify "D:\Chrome Downloads\Claude Powerd Lead Gen system\new lead system" --update`
+
+---
+
+## 🏗️ ARCHITECTURE — Full Data Flow
+
+```
+YouTube API (4 keys, auto-rotating)
+        ↓
+scraper_engine.py → scrape_leads() [GENERATOR]
+    ├─ Dual search: channel search + video search (3-5x more leads)
+    ├─ channel_qualifier.py  ← email-first (extract before video fetch = 75% API savings)
+    ├─ smart_scorer.py + cta_detector.py  ← intelligent lead scoring
+    ├─ channel_blacklist.py  ← SQLite, permanent no-re-contact
+    └─ Stops at EXACT target (multiple break levels)
+        ↓
+notion_manager.py → Notion Database (CRM)  ← GOD NODE degree 51
+        ↓
+app.py (Flask dashboard)
+    ├─ Auth: _auth() decorator — session-based, password only
+    ├─ Security: security.py — bot/UA detection, IP blocklist, decoy page
+    ├─ Routes: /api/leads, /api/start-scrape, /api/send-emails, etc.
+    ├─ Live log: SSE stream at /stream (real-time to dashboard)
+    └─ Background threads: scraper, email sender, followup, reply checker
+        ↓
+claude_helpers.py → write_personalized_initial_email() / write_personalized_followup_1()
+    └─ Fallback template if Claude API fails (claude_failed flag)
+        ↓
+email_helpers.py → EmailRotator → _smtp_send()
+    ├─ 3 Hostinger accounts: jashan / ruwaid / danish @fuelviaa.com
+    ├─ SMTP timeout=30 (CRITICAL — prevents 2-min hangs on dead connections)
+    ├─ 2-minute delay between sends (EMAIL_ROTATION_DELAY = 120s)
+    └─ 40 emails/account/day (daily_send_limit.py SQLite)
+        ↓
+Notion Update — 3 SEPARATE try/except blocks (never chain these):
+    1. update_lead_status("Contacted")  ← FIRST — double-send guard
+    2. save_day1_email_body()
+    3. update_email_sent_from()
+        ↓
+followup.py → FollowupSystem
+    ├─ Uses SAME account as original cold email (Email Sent From field)
+    ├─ Claude writes follow-up
+    └─ Marks Day 2 Sent = True in Notion
+        ↓
+email_helpers.py → ReplyChecker (IMAP)
+    ├─ Scans all 3 Hostinger inboxes
+    ├─ Matches sender email → Notion lead record
+    └─ mark_replied() → status = "Replied" + stores reply text
 ```
 
 ---
 
-## SYSTEM ARCHITECTURE
+## 📁 FILE MAP — Every File and What It Does
 
-### High-Level Data Flow
+### Core
+| File | Role | Graph Degree |
+|------|------|-------------|
+| `app.py` | Flask server, ALL routes, background threads, SSE | 19 (_auth) |
+| `config.py` | All constants: API keys, niches, locations, limits | — |
+| `config_secure.py` | Secure loader: `get_outreach_accounts()`, `get_youtube_api_keys()` | — |
 
-```
-YouTube Search (API)
-        ↓
-Scraper Engine (scraper_engine.py)
-    ├─ Filters by: niche, location, subscriber range
-    ├─ Checks email existence (early filtering)
-    ├─ Qualifies channels (video freshness, activity)
-    ├─ Prevents duplicates (blacklist + Notion check)
-        ↓
-Qualified Leads → Notion Database
-        ↓
-Flask Dashboard (app.py) ← User Interface
-    ├─ Select leads for outreach
-    ├─ Trigger email campaigns
-        ↓
-Email Rotation Manager (_next_account)
-    ├─ Cycles through 3 Hostinger accounts
-    ├─ Enforces 40/account/day limit
-    ├─ Enforces 2-minute delays between sends
-        ↓
-Claude API (claude_helpers.py)
-    ├─ Writes personalized email for each lead
-    ├─ Fallback template if API fails
-        ↓
-SMTP Send (Hostinger)
-    ├─ Sends via jashan/ruwaid/danish@fuelviaa.com
-    ├─ From header: "Name - Fuelvia <email@fuelviaa.com>"
-        ↓
-Notion Update (3 separate operations)
-    ├─ update_lead_status → "Contacted" (FIRST - critical guard)
-    ├─ save_day1_email_body → stores email text
-    ├─ update_email_sent_from → records sending account
-        ↓
-IMAP Reply Detection (app.py _run_check_replies)
-    ├─ Scans 3 email inboxes
-    ├─ Matches replies to leads
-    ├─ Updates Notion with reply content
-        ↓
-Follow-up Management
-    ├─ Sends from SAME account as cold email
-    ├─ Uses Claude to write follow-up
-    ├─ Updates Day 2 Sent flag
-```
+### Email Pipeline
+| File | Role |
+|------|------|
+| `email_helpers.py` | `EmailRotator` (3 accounts), `send_outreach_email()`, `ReplyChecker` IMAP |
+| `followup.py` | `FollowupSystem`: send follow-up 1, check replies, mark closed |
+| `email_templates.py` | Fallback templates: initial, followup_1, followup_2 |
+| `email_compliance.py` | `EmailCompliance`: unsubscribe tokens, bounce log, GDPR footer |
+| `claude_helpers.py` | `write_personalized_initial_email()` + `write_personalized_followup_1()` |
 
-### Core Components
+### Scraping & Qualification
+| File | Role | Graph Degree |
+|------|------|-------------|
+| `scraper_engine.py` | `scrape_leads()` generator — dual YouTube search | 11 |
+| `channel_qualifier.py` | `qualify_channel()`: email extract + hard/soft filters, score 0-7 | — |
+| `smart_scorer.py` | `intelligent_score_channel()`: engagement, activity, upload freq | 11 |
+| `cta_detector.py` | `score_ctas()`, `score_b2b_language()`, `has_entertainment_focus()` | — |
+| `youtube_enricher.py` | `get_videos_for_channel()`, `days_since_last_video()` | — |
+| `channel_blacklist.py` | SQLite blacklist (`channel_blacklist.db`) | — |
 
-**1. SCRAPER ENGINE (scraper_engine.py)**
-- Input: niche_key, location_key, sub_range_key, max_leads
-- Output: Qualified leads with: channel_name, email, subscriber_count, videos_data
-- Key Logic:
-  * Extracts keywords and locations from config
-  * Gets subscriber range from config (min, max)
-  * Creates keyword-location pairs (one at a time)
-  * For each search: fetch channels → check blacklist → get details → check subscriber range → extract email → fetch videos → qualify channel → check Notion duplicate → add to qualified list
-  * STOPS AT EXACT TARGET (multiple break levels)
-  * Early email extraction before video fetching (75% API quota savings)
-  * Blacklist persistence prevents duplicate contact attempts
+### Notion CRM
+| File | Role | Graph Degree |
+|------|------|-------------|
+| `notion_manager.py` | `NotionManager` class — ALL Notion CRUD, retry logic | **51 (most connected)** |
 
-**2. EMAIL ROTATION & DAILY LIMITS (app.py + daily_send_limit.py)**
-- 3 Hostinger accounts: jashan@fuelviaa.com, ruwaid@fuelviaa.com, danish@fuelviaa.com
-- Global counter (_email_rot_idx) cycles through accounts with thread locking
-- Daily limit: SQLite database tracks sends per account per date
-- Enforcement: `has_room_today(account_email)` checked BEFORE sending, `increment_today_count()` after successful send
-- Limit: 40 emails per account per day (resets at midnight UTC)
-- Delay: 2 minutes (120 seconds) between each send to protect new domain reputation
+### Data & Limits
+| File | Role |
+|------|------|
+| `daily_send_limit.py` | SQLite per-account daily counter (`daily_send_limit.db`) |
+| `quota_manager.py` | YouTube API quota tracker (`quota_data.json`) |
+| `backup_manager.py` | SQLite backups of leads/emails/replies (`leads_backup.db`) |
+| `lead_intelligence.py` | Niche health, expansion suggestions, lead freshness |
+| `error_logger.py` | `ErrorLogger`: structured logs + alert emails on critical errors |
 
-**3. NOTION INTEGRATION (notion_manager.py)**
-- Database ID stored in config.py (NOTION_DATABASE_ID)
-- Connection pooling with retry strategy (exponential backoff for transient errors)
-- Key operations:
-  * `get_all_leads()` - Fetches all records
-  * `check_duplicate(email)` - Returns (is_duplicate, page_id)
-  * `update_lead_status(page_id, status)` - Changes status field
-  * `save_day1_email_body(page_id, body)` - Stores cold email text
-  * `update_email_sent_from(page_id, account_email)` - Records which account sent it
-  * `mark_followup1_sent(page_id)` - Sets Day 2 Sent = True, status = "Follow-up 1"
-  * `mark_replied(email, reply_message)` - Updates with reply and status = "Replied"
-- **CRITICAL**: All three post-send operations are in SEPARATE try/except blocks with status update running FIRST as the critical guard against double-sends
+### Security & Maintenance
+| File | Role |
+|------|------|
+| `security.py` | `@check_suspicious_request` decorator, bot/UA detection, decoy page |
+| `cleanup_notion.py` | Remove non-"New" leads from Notion |
+| `cleanup_low_subscribers.py` | Archive leads with <1000 subscribers |
+| `run_audit.py` | Full system health audit |
+| `airtable_manager.py` | Legacy (replaced by Notion — do not use) |
 
-**4. CLAUDE EMAIL WRITING (claude_helpers.py)**
-- Input: channel_data (subscriber_count, niche, etc) + videos (recent video info)
-- Output: (subject, body) tuple
-- Personalization: Uses channel metrics and video data to craft unique cold email
-- Fallback: If Claude API fails (402, timeout, etc), uses generic template
-- Flag: `claude_failed` set to True if fallback used, warning logged to live log
-
-**5. FLASK DASHBOARD (app.py + dashboard_new.html)**
-- Single-page app with tabbed interface
-- Authentication: Password only (fuelvia2025)
-- Tabs:
-  * Overview: Statistics, key metrics
-  * All Leads: Table view of all leads with filters
-  * Emails: Email activity log
-  * Replies: Reply detection results
-  * Scraper: Form to start new scraping campaigns
-- Live logging: Real-time event stream for all background jobs
-- Background jobs: Scraping, email sending, follow-ups, reply detection (all threaded)
-
-**6. REPLY DETECTION (app.py _run_check_replies)**
-- Scans all 3 IMAP inboxes (Hostinger)
-- Searches for unread emails containing "Re:" or "Fwd:"
-- Extracts sender and reply text
-- Matches to Notion leads via email lookup
-- Updates Notion with: status = "Replied", reply content, reply date
-- Note: "Reply Message " field has trailing space (Notion field name)
+### Old Scrapers — ARCHIVED, do NOT use
+`generate.py`, `generate_v2.py`, `generate_v3.py` — all superseded by `scraper_engine.py`
 
 ---
 
-## KEY BUSINESS RULES & LIMITS
+## ⚙️ CONFIGURATION
 
-**Email Campaign Rules:**
-- Max 30 leads per scrape search
-- Max 40 emails per account per day (hard limit)
-- 2-minute gap between each email send
-- Only 2 total emails per lead: 1 cold + 1 follow-up (no 3rd email)
-- If reply received: campaign ends (user manually decides next steps)
-
-**Subscriber Range Filtering:**
-- Default: 1,000 - 20,000 subscribers (RECOMMENDED)
-- Other options: 1K-5K, 5K-10K, 10K-15K, 50K-100K, 100K+
-- Scraper rejects any channel outside selected range
-- Notion database should contain ONLY leads ≥ 1,000 subs (cleanup_low_subscribers.py removes outliers)
-
-**Lead Statuses in Notion:**
-- "New": Not contacted yet
-- "Contacted": Cold email sent, awaiting response
-- "Follow-up 1": Follow-up sent
-- "Replied": Reply received from creator
-- Blank status: Removed during database cleanup
-
-**Domain Reputation Protection:**
-- Domain (fuelviaa.com) is 1 week old → low initial reputation
-- 2-minute delays prevent spam filter triggers
-- Account rotation distributes load (3 accounts = 120 emails/day max total)
-- Email-first filtering saves API quota (don't fetch videos for channels without email)
-
----
-
-## CRITICAL FILES & THEIR PURPOSES
-
-| File | Purpose | Critical? |
-|------|---------|-----------|
-| **app.py** | Flask server, all routes, email/scraper/reply threading | YES |
-| **notion_manager.py** | All Notion API calls with retry logic | YES |
-| **scraper_engine.py** | YouTube search, lead qualification, precision rules | YES |
-| **config.py** | All configuration: API keys, niches, locations, ranges | YES |
-| **email_config.json** | 3 Hostinger account credentials (SMTP) | YES |
-| **claude_helpers.py** | Claude API calls for email writing | YES |
-| **daily_send_limit.py** | SQLite tracking of daily email counts | YES |
-| **dashboard_new.html** | Frontend UI (all tabs, forms, live logging) | YES |
-| **youtube_enricher.py** | YouTube API calls for channel/video data | NO |
-| **lead_intelligence.py** | Niche expansion suggestions (dashboard feature) | NO |
-| **test_smtp_hostinger.py** | SMTP connection testing (verification only) | NO |
-| **test_founder_names.py** | Founder name extraction testing (verification only) | NO |
-| **cleanup_notion.py** | Remove non-"New" status leads (maintenance) | NO |
-| **cleanup_low_subscribers.py** | Remove leads <1000 subs (maintenance) | NO |
-| **PRE_DEPLOYMENT_TEST.md** | Complete test suite and checklist | NO |
-
----
-
-## ENVIRONMENT & CONFIGURATION
-
-**Environment Variables (in config.py):**
-- `NOTION_API_KEY` - Notion integration token
-- `NOTION_DATABASE_ID` - Notion leads database ID
-- `YOUTUBE_APIS` - List of YouTube API keys (for rotation)
-- `SENDER_NAME` - Default sender name if Claude fails
-- `COMPANY_NAME` - "Fuelvia"
-
-**Config Constants (in config.py):**
-- `NICHE_OPTIONS` - Dict of niche keywords for search
-- `LOCATION_OPTIONS` - Dict of location filters
-- `SUBSCRIBER_RANGES` - Dict of subscriber range options
-- `EMAIL_ROTATION_DELAY` - 120 seconds (2 minutes)
-- `DASHBOARD_PASSWORD` - "fuelvia2025"
-- `ADMIN_KEY` - For remote config updates
-
-**Database Files:**
-- `daily_send_limit.db` - SQLite tracking daily email counts per account
-- `blacklist.db` - SQLite tracking blacklisted channel IDs (no re-contact)
-- `email_config.json` - Hostinger account credentials
-
----
-
-## DEPLOYMENT & TESTING
-
-**Pre-Deployment Checklist (from PRE_DEPLOYMENT_TEST.md):**
-1. PHASE 1: Email & SMTP (15 mins) - Test all 3 accounts
-2. PHASE 2: Scraper Logic (20 mins) - Test max 30 limit, precision, blacklist
-3. PHASE 3: Cold Email Campaign (10 mins) - Test send, logging, Notion updates
-4. PHASE 4: Follow-ups (10 mins) - Test follow-up send and Notion updates
-5. PHASE 5: Reply Detection (5 mins) - Test IMAP scanning
-6. PHASE 6: Dashboard UI (5 mins) - Test all tabs and responsiveness
-7. QUICK TESTS (10 tests, 5 mins each)
-8. CRITICAL CHECKS (12 must-have working, 13 must-NOT-have)
-9. PERFORMANCE BENCHMARKS (6 metrics)
-10. DEPLOYMENT CHECKLIST (20+ sign-off items)
-
-**Common Commands:**
-```bash
-# Start server
-py app.py
-
-# Test SMTP (all 3 accounts)
-py test_smtp_hostinger.py
-
-# Test founder name extraction
-py test_founder_names.py
-
-# Clean up non-"New" leads
-py cleanup_notion.py
-
-# Clean up low-subscriber leads
-py cleanup_low_subscribers.py
-
-# Check server log
-tail -100 server.log
-
-# Stop server (Windows)
-taskkill /F /IM python.exe
-```
-
----
-
-## KNOWN ISSUES & FIXES APPLIED
-
-**FIXED BUGS:**
-1. ✅ Double-email bug - Separated Notion updates into 3 independent try/except blocks
-2. ✅ Claude API failure - Added claude_failed flag and fallback template
-3. ✅ No daily limit - Implemented SQLite tracking with has_room_today()
-4. ✅ Hardcoded target leads - Made scraper accept max_leads parameter
-5. ✅ Follow-up skip when blank - Added explicit warning if Email Sent From is blank
-6. ✅ Founder names not personalized - Added dynamic extraction from email addresses
-7. ✅ Scraper overshooting - Implemented multiple break levels and target_reached flag
-8. ✅ API quota waste - Added email-first filtering (extract email before fetching videos)
-9. ✅ Max 30 validation - Added frontend max="30" + backend 400 error for >30
-
-**CURRENT ISSUES:**
-- None known; system ready for pre-deployment testing
-
----
-
-## DEVELOPER NOTES
-
-**Email Rotation Logic:**
-- Global counter `_email_rot_idx` increments after each send
-- Thread-safe with `_email_rot_lock`
-- Formula: `account = OUTREACH_ACCOUNTS[_email_rot_idx % 3]`
-- Cycles: jashan → ruwaid → danish → jashan ...
-
-**Double-Email Prevention:**
-The critical protection is: Status update FIRST, other updates AFTER
+### API Keys — config.py / .env
 ```python
-try:
-    notion.update_lead_status(lead["id"], "Contacted")  # FIRST
-except:
-    log_error()
-    # Still proceed to next lead
+NOTION_API_KEY       = "secret_..."   # notion.so/my-integrations
+NOTION_DATABASE_ID   = "..."          # 32-char DB ID from URL
+YOUTUBE_APIS         = ["AIza..."]    # 4 keys, rotated on quota error
+CLAUDE_API_KEY       = "sk-ant-..."   # via aicredits.in proxy
 ```
-If status update fails, lead stays "New" and won't be re-sent (because it's still "New" on next check)
 
-**Notion Property Names:**
-- Standard fields: "Channel Name", "Email", "Status", "Subscriber Count", etc.
-- Special: "Reply Message " has TRAILING SPACE (match Notion field exactly)
+### Email Accounts — email_config.json
+```json
+{ "outreach_emails": [
+    { "email": "jashan@fuelviaa.com",  "smtp_server": "smtp.hostinger.com", "smtp_port": 587 },
+    { "email": "ruwaid@fuelviaa.com",  "smtp_server": "smtp.hostinger.com", "smtp_port": 587 },
+    { "email": "danish@fuelviaa.com",  "smtp_server": "smtp.hostinger.com", "smtp_port": 587 }
+]}
+```
 
-**Scraper Precision Rules:**
-1. Max 30 leads per search (hard limit)
-2. Stop at exact target (multiple break levels)
-3. One keyword-location combo at a time
-4. Break ALL loops at target
-5. Check email BEFORE qualification (API savings)
-6. Live log: "Found X of Y requested leads"
-7. Graceful exhaustion message
-
-**Rate Limiting & Quotas:**
-- YouTube API: 4 keys with rotation for quota management
-- Notion API: Retry strategy with exponential backoff
-- SMTP: 40 emails/account/day, 2-minute gaps between sends
-- Claude API: Fallback template if fails
+### Limits — config.py
+```python
+EMAIL_ROTATION_DELAY          = 120   # seconds between sends
+MAX_EMAILS_PER_ACCOUNT_PER_DAY = 40  # 120/day total
+MAX_LEADS_PER_SCRAPE          = 30    # hard cap
+DASHBOARD_PASSWORD            = "fuelvia2025"
+ADMIN_KEY                     = "..."
+```
 
 ---
 
-## NEXT IMMEDIATE STEPS
+## 📊 NOTION DATABASE SCHEMA
 
-1. **Run complete pre-deployment test suite** (PRE_DEPLOYMENT_TEST.md)
-   - 10 quick tests covering all functionality
-   - 12 critical checks (must be working)
-   - 13 critical anti-checks (must NOT happen)
-   - Performance benchmarks
+**Status flow:** New → Contacted → Follow-up 1 → Follow-up 2 → Replied → Closed
 
-2. **Fix any bugs discovered during testing**
-
-3. **Deploy to work.z**
-   - Update target URL in documentation
-   - Verify production Notion database is connected
-   - Verify production email accounts are working
-   - Run final sanity check
-
-4. **Monitor first 3 days of live operation**
-   - Watch email delivery rates
-   - Watch for bounces
-   - Monitor reply rates
-   - Check Notion updates are happening
+| Field | Type | Notes |
+|-------|------|-------|
+| Channel Name | title | — |
+| Email | email | — |
+| Status | select | See flow above |
+| Subscriber Count | number | — |
+| YouTube URL | url | — |
+| Niche | select | — |
+| Location | select | — |
+| Day 1 Email Body | rich_text | Stored after send |
+| Email Sent From | email | Which account sent it |
+| Day 2 Sent | checkbox | Follow-up sent flag |
+| Reply Message  | rich_text | ⚠️ TRAILING SPACE in field name |
+| Reply Date | date | — |
+| Last Contact | date | — |
 
 ---
 
-## SESSION HANDOFF NOTES
+## 🔑 CRITICAL RULES — Never Break
 
-This system has been extensively tested in development. The 3 Hostinger email accounts are configured, all SMTP connections pass, Notion API is integrated, Claude API fallback is working, and the 2-minute delay enforcement is in place.
+1. **Status update FIRST** — `update_lead_status("Contacted")` before logging send result → prevents double-send on crash
+2. **SMTP timeout=30** — always. Without it dead connections hang for 120s
+3. **3 separate try/except** for post-send Notion updates — never chain them
+4. **Follow-up = same account** as cold email — read `Email Sent From` field
+5. **Max 2 emails per lead** — cold + 1 follow-up. Block any 3rd attempt
+6. **Email-first filter** — extract email from description BEFORE fetching videos
+7. **`Reply Message ` has trailing space** — match Notion field name exactly
 
-The last session completed:
-- Fixed all known bugs
-- Implemented 2-minute delays between emails
-- Added comprehensive logging with Notion update confirmations
-- Cleaned Notion database (removed non-"New" and <1000 subscriber leads)
-- Verified all 5 critical verification checks PASS
-- Created pre-deployment test suite (PRE_DEPLOYMENT_TEST.md)
+---
 
-The immediate next action is to run the complete test suite and fix any issues found. System should be production-ready after testing phase.
+## 🐛 BUGS FIXED (do not reintroduce)
+
+| Bug | Fix |
+|-----|-----|
+| SMTP hangs 2 min on failure | `timeout=30` on `smtplib.SMTP()` |
+| Double email send on crash | Status → "Contacted" FIRST in its own try/except |
+| Claude API 402/timeout | `claude_failed` flag + fallback template |
+| No daily send limit | SQLite tracking in `daily_send_limit.py` |
+| Scraper overshooting target | `target_reached` flag + multiple break levels |
+| API quota wasted on no-email channels | Email extracted before video fetch |
+| Follow-up from wrong account | `Email Sent From` lookup before send |
+| `_smtp_send` returned bool only | Changed to `(bool, error_str)` tuple, logs actual error |
+
+---
+
+## 🖥️ COMMON COMMANDS
+
+```bash
+py app.py                          # Start server
+py test_smtp_hostinger.py          # Test all 3 SMTP accounts
+py cleanup_notion.py               # Remove non-New leads
+py cleanup_low_subscribers.py      # Remove <1000 sub leads
+py run_audit.py                    # Full health audit
+
+# Quick checks
+py -c "from daily_send_limit import get_all_today_counts; print(get_all_today_counts())"
+py -c "from quota_manager import get_quota; print(get_quota())"
+
+# Kill server (Windows)
+taskkill /F /IM py.exe
+```
+
+---
+
+## 🗂️ GRAPH COMMUNITY LABELS (38 communities)
+
+| # | Community Focus |
+|---|----------------|
+| 0 | Email send pipeline + daily limits + YouTube enricher |
+| 1 | Flask API routes (send, scrape, dashboard) |
+| 2 | Follow-up system + IMAP reply checker |
+| 3 | CTA detector + smart scorer |
+| 4 | Email compliance (GDPR, unsubscribe, bounce) |
+| 5 | Secure config + error logger/alerts |
+| 6 | Channel blacklist + scraper engine core |
+| 7 | NotionManager CRUD operations |
+| 8 | Security layer (bot detection, decoy) |
+| 9 | Email rotator + send helpers |
+| 11 | Dashboard API + NotionManager hub (highest traffic) |
+| 17 | Claude AI email writing |
+
+---
+
+## 📂 FULL DIRECTORY
+
+```
+new lead system\
+├── app.py                     ← Main Flask server
+├── config.py                  ← All config
+├── config_secure.py           ← Credential loader
+├── scraper_engine.py          ← YouTube scraper (USE THIS)
+├── notion_manager.py          ← Notion CRM (degree 51)
+├── claude_helpers.py          ← AI email writer
+├── email_helpers.py           ← SMTP + IMAP + rotation
+├── followup.py                ← Follow-up system
+├── email_compliance.py        ← GDPR compliance
+├── channel_qualifier.py       ← Lead qualification
+├── smart_scorer.py            ← Lead scoring
+├── cta_detector.py            ← B2B detection
+├── youtube_enricher.py        ← YouTube API calls
+├── channel_blacklist.py       ← SQLite blacklist
+├── daily_send_limit.py        ← Daily email counters
+├── quota_manager.py           ← API quota tracker
+├── security.py                ← Bot detection
+├── error_logger.py            ← Logging + alerts
+├── backup_manager.py          ← SQLite backups
+├── lead_intelligence.py       ← Niche analytics
+├── email_config.json          ← SMTP credentials
+├── Start Fuelvia.bat          ← Windows launcher
+├── graphify-out/              ← KNOWLEDGE GRAPH (query this)
+│   ├── graph.json
+│   ├── graph.html
+│   └── GRAPH_REPORT.md
+└── templates/
+    └── dashboard_new.html     ← Frontend UI
+```
+
+---
+
+## ✅ NEW SESSION CHECKLIST
+
+1. Read THIS file → you have full context, no file reading needed
+2. Specific function questions → `/graphify query "..."`
+3. After code changes → `/graphify ... --update`
+4. Do NOT open individual .py files unless making a specific edit
+5. Check `server.log` for recent errors before touching anything
+
+---
+
+*Graph: 480 nodes · 729 edges · 38 communities · AST · 2026-05-19*
+*Stack: Python Flask · Notion API · YouTube API · Hostinger SMTP · Claude API · SQLite*

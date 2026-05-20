@@ -378,6 +378,28 @@
                     <div class="form-group"><label>Subscriber Range</label><select id="scraper-sub-range"><option>Loading…</option></select></div>
                     <div class="form-group"><label>Target <span style="color:#7a5c00;font-size:11px;">(Max 30)</span></label><input type="number" id="scraper-count" value="25" min="1" max="30"></div>
                 </div>
+                <div class="form-row" style="margin-top:8px;">
+                    <div class="form-group"><label>📅 Date Filter <span style="color:#555;font-size:11px;">(freshness)</span></label><select id="scraper-date-filter">
+                        <option value="">Any time (default)</option>
+                        <option value="7">Last 7 days</option>
+                        <option value="30">Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="180">Last 180 days</option>
+                    </select></div>
+                    <div class="form-group"><label>🏙 City Drilling <span style="color:#555;font-size:11px;">(local pools)</span></label><select id="scraper-city-drill">
+                        <option value="Disabled">Disabled</option>
+                        <option value="🇺🇸 USA Cities (50)">🇺🇸 USA Cities (50)</option>
+                        <option value="🇬🇧 UK Cities (20)">🇬🇧 UK Cities (20)</option>
+                        <option value="🇨🇦 Canada Cities (15)">🇨🇦 Canada Cities (15)</option>
+                        <option value="🇦🇺 Australia Cities (10)">🇦🇺 Australia Cities (10)</option>
+                    </select></div>
+                    <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:4px;">
+                        <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" id="scraper-fresh-kw" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);">
+                            <span style="font-size:13px;">🔄 Smart Keywords</span>
+                        </label>
+                    </div>
+                </div>
                 <div class="btn-group">
                     <button class="btn btn-primary" id="btn-start" onclick="startScrape()">▷ Start</button>
                     <button class="btn btn-warning hidden" id="btn-pause" onclick="pauseScrape()">⏸ Pause</button>
@@ -602,13 +624,22 @@ function loadScraperOptions(){
 }
 
 function startScrape(){
-    var niche=document.getElementById('scraper-niche').value,location=document.getElementById('scraper-location').value,sub_range=document.getElementById('scraper-sub-range').value,max_leads=parseInt(document.getElementById('scraper-count').value);
+    var niche=document.getElementById('scraper-niche').value,
+        location=document.getElementById('scraper-location').value,
+        sub_range=document.getElementById('scraper-sub-range').value,
+        max_leads=parseInt(document.getElementById('scraper-count').value),
+        date_filter_raw=document.getElementById('scraper-date-filter').value,
+        city_drill_key=document.getElementById('scraper-city-drill').value,
+        use_fresh_keywords=document.getElementById('scraper-fresh-kw').checked;
+    var date_filter_days=date_filter_raw?parseInt(date_filter_raw):null;
     if(max_leads>30){alert('Maximum 30 leads per search.');return;}
     if(max_leads<1){alert('Enter at least 1.');return;}
     document.getElementById('btn-start').classList.add('hidden');
     document.getElementById('btn-pause').classList.remove('hidden');
     document.getElementById('btn-stop').classList.remove('hidden');
-    fetch('/api/start-scrape',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:niche,location:location,sub_range:sub_range,max_leads:max_leads})})
+    var payload={niche:niche,location:location,sub_range:sub_range,max_leads:max_leads,
+        date_filter_days:date_filter_days,city_drill_key:city_drill_key,use_fresh_keywords:use_fresh_keywords};
+    fetch('/api/start-scrape',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();}).then(function(d){if(!d.success){alert('Failed: '+(d.error||'Unknown'));document.getElementById('btn-start').classList.remove('hidden');document.getElementById('btn-pause').classList.add('hidden');document.getElementById('btn-stop').classList.add('hidden');}});
     updateScraperStatus();
 }

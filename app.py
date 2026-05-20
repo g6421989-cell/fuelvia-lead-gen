@@ -663,14 +663,30 @@ def api_expansion_suggestions():
 
 # ── Scraper — background thread ────────────────────────────────
 
-def _run_scraper(niche: str, location: str, sub_range: str, max_leads: int):
+def _run_scraper(
+    niche: str, location: str, sub_range: str, max_leads: int,
+    date_filter_days: int = None,
+    city_drill_key: str = None,
+    use_fresh_keywords: bool = True,
+):
     _log(f"[{_ts()}] ▷ Starting — niche={niche} | loc={location} | range={sub_range} | target={max_leads}")
+    if date_filter_days:
+        _log(f"[{_ts()}] 📅 Date filter: last {date_filter_days} days")
+    if city_drill_key and city_drill_key != "Disabled":
+        _log(f"[{_ts()}] 🏙 City drilling: {city_drill_key}")
+    if use_fresh_keywords:
+        _log(f"[{_ts()}] 🔄 Smart keyword rotation: ON")
     with _state_lock:
         _scrape_state.update({"status": "running", "progress": 0, "leads_found": 0, "total": int(max_leads)})
 
     _ICONS = {"success":"✅","warning":"⚠","error":"❌","info":"  ","progress":"📊","complete":"🏁"}
     try:
-        for event in scrape_leads(niche, location, sub_range, max_leads):
+        for event in scrape_leads(
+            niche, location, sub_range, max_leads,
+            date_filter_days=date_filter_days,
+            city_drill_key=city_drill_key,
+            use_fresh_keywords=use_fresh_keywords,
+        ):
             if _stop_event.is_set():
                 _log(f"[{_ts()}] ⏹ STOPPED by user")
                 with _state_lock: _scrape_state["status"] = "stopped"
@@ -721,6 +737,16 @@ def api_start_scrape():
     sub_range = data.get("sub_range", "").strip()
     max_leads = int(data.get("max_leads", 30))
 
+    # v4 fresh-lead params
+    date_filter_days  = data.get("date_filter_days")   # int or None
+    city_drill_key    = data.get("city_drill_key", "Disabled")
+    use_fresh_keywords = bool(data.get("use_fresh_keywords", True))
+    if date_filter_days is not None:
+        try:
+            date_filter_days = int(date_filter_days)
+        except (ValueError, TypeError):
+            date_filter_days = None
+
     # ── RULE 1: Hard limit validation — backend guard ──
     if max_leads > 30:
         return jsonify({"success": False, "error": "Maximum 30 leads per search. Please enter 30 or less."}), 400
@@ -731,7 +757,16 @@ def api_start_scrape():
         return jsonify({"success": False, "error": "Missing niche, location, or subscriber range"}), 400
     _stop_event  = threading.Event()
     _pause_event = threading.Event()
-    t = threading.Thread(target=_run_scraper, args=(niche, location, sub_range, max_leads), daemon=True)
+    t = threading.Thread(
+        target=_run_scraper,
+        args=(niche, location, sub_range, max_leads),
+        kwargs={
+            "date_filter_days":  date_filter_days,
+            "city_drill_key":    city_drill_key,
+            "use_fresh_keywords": use_fresh_keywords,
+        },
+        daemon=True,
+    )
     with _state_lock:
         _scrape_state["thread"] = t
         _scrape_state["logs"]   = []

@@ -1,5 +1,5 @@
 # ============================================================
-# SCRAPER ENGINE v3 — Dual-Source Discovery
+# SCRAPER ENGINE v4 — Fresh Leads Every Run
 # ============================================================
 # RULES:
 # 1. Hard limit 30 max (enforced in API)
@@ -10,13 +10,12 @@
 # 6. Live log shows "Found X of Y"
 # 7. Graceful exhaustion if all combos searched
 #
-# v3 NEW — DUAL-SOURCE DISCOVERY:
-# YouTube channel search only returns its top ~500 popular
-# results for any query. For every keyword-location pair we
-# now ALSO run a VIDEO search and extract channel IDs from
-# those results. Video search surfaces completely different,
-# mostly smaller creators that channel search never shows.
-# Combined pool is typically 3–5x larger per keyword.
+# v4 NEW — 5 FRESH-LEAD SOLUTIONS:
+# 1. Page token persistence  — resumes from last page token per query
+# 2. City drilling           — appends city names for local creator pools
+# 3. Date filter             — publishedAfter to find recently active channels
+# 4. Niche video suffixes    — title-style queries surface different creators
+# 5. Smart keyword rotation  — Claude avoids already-used keywords
 # ============================================================
 
 import re
@@ -27,12 +26,17 @@ from googleapiclient.discovery import build
 from config import (
     YOUTUBE_APIS, NICHE_OPTIONS, NICHE_SEARCH_TERMS,
     LOCATION_OPTIONS, SUBSCRIBER_RANGES,
+    CITY_DRILL_OPTIONS, VIDEO_SEARCH_SUFFIXES, FRESHNESS_OPTIONS,
 )
 from notion_manager import NotionManager
 from youtube_enricher import get_videos_for_channel, days_since_last_video
 from channel_qualifier import qualify_channel, extract_email_from_all_sources
 from channel_blacklist import is_blacklisted, add_to_blacklist, blacklist_size
 from claude_helpers import generate_keyword_variations
+from search_tokens import (
+    get_token, save_token,
+    get_used_keywords, save_used_keywords,
+)
 
 DEFAULT_TARGET_LEADS = 30
 
@@ -270,15 +274,26 @@ def _process_channel(
 
 # ── Main generator ────────────────────────────────────────
 
-def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_leads: int = None):
+def scrape_leads(
+    niche_key:        str,
+    location_key:     str,
+    sub_range_key:    str,
+    max_leads:        int = None,
+    date_filter_days: int = None,
+    city_drill_key:   str = None,
+    use_fresh_keywords: bool = True,
+):
     """
     Generator — yields event dicts until exactly max_leads are found.
 
-    Discovery strategy per keyword-location pair:
-      Phase A: YouTube channel search  (YouTube's popularity-biased pool)
-      Phase B: YouTube VIDEO search    (completely different creator pool)
+    v4 parameters:
+      date_filter_days  — only surface channels that uploaded in last N days (None = any time)
+      city_drill_key    — key from CITY_DRILL_OPTIONS to append city names to queries
+      use_fresh_keywords — tell Claude to avoid already-used keywords (default True)
 
-    Both phases feed into the same qualification pipeline.
+    Discovery strategy per keyword-location pair:
+      Phase A: YouTube channel search  (popularity-biased pool, paginated from last token)
+      Phase B: YouTube VIDEO search    (different creator pool — title-style queries)
     """
     # ── Guard: API keys must be configured ───────────────────────────
     if not YOUTUBE_APIS:
@@ -295,44 +310,73 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
     target_leads = max_leads if max_leads and max_leads > 0 else DEFAULT_TARGET_LEADS
 
     start_ts  = datetime.now()
-    keywords  = NICHE_SEARCH_TERMS.get(niche_key, [niche_key])
+    keywords  = list(NICHE_SEARCH_TERMS.get(niche_key, [niche_key]))
     loc_list  = LOCATION_OPTIONS.get(location_key, [""])
     sub_min, sub_max = SUBSCRIBER_RANGES.get(sub_range_key, (1000, 20000))
+
+    # ── Solution 3: Date filter (publishedAfter) ──────────────────────
+    published_after = None
+    if date_filter_days:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=date_filter_days)
+        published_after = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # ── Solution 2: City drilling ─────────────────────────────────────
+    city_list = []
+    if city_drill_key and city_drill_key in CITY_DRILL_OPTIONS:
+        city_list = CITY_DRILL_OPTIONS[city_drill_key]
 
     bl_size = blacklist_size()
     yield _evt("info", f"Niche: {niche_key}  |  Location: {location_key}")
     yield _evt("info", f"Subscriber range: {sub_range_key}")
     yield _evt("info", f"Blacklist: {bl_size} channels permanently skipped")
+    if published_after:
+        yield _evt("info", f"Date filter: last {date_filter_days} days only → freshest channels")
+    if city_list:
+        yield _evt("info", f"City drilling: {len(city_list)} cities → {len(city_list) * len(keywords)} extra query combos")
 
-    # ── Keyword variation expansion (one Claude call) ─────────────────
-    yield _evt("info", f"Generating keyword variations with Claude…")
-    variations = generate_keyword_variations(niche_key, keywords)
+    # ── Solution 5: Smart keyword rotation ───────────────────────────
+    # Pass already-used keywords to Claude so it generates NEW variations
+    used_kws = get_used_keywords(niche_key) if use_fresh_keywords else []
+    yield _evt("info", f"Generating keyword variations with Claude… ({len(used_kws)} already used → will avoid)")
+    variations = generate_keyword_variations(niche_key, keywords, used_keywords=used_kws)
     if variations:
         keywords = keywords + variations
         yield _evt("success",
-            f"Claude added {len(variations)} keyword variations → {len(keywords)} total keywords"
+            f"Claude added {len(variations)} fresh keyword variations → {len(keywords)} total"
         )
     else:
         yield _evt("info", f"No variations generated (Claude unavailable) — using {len(keywords)} base keywords")
 
-    yield _evt("info", f"Keywords ({len(keywords)}): {', '.join(keywords)}")
+    # Save all keywords as used so next run gets different ones
+    if use_fresh_keywords:
+        save_used_keywords(niche_key, keywords)
+
+    # ── Solution 4: Niche video search suffixes ───────────────────────
+    niche_suffixes = VIDEO_SEARCH_SUFFIXES.get(niche_key, VIDEO_SEARCH_SUFFIXES.get("other", []))
+
+    yield _evt("info", f"Keywords ({len(keywords)}): {', '.join(keywords[:5])}{'…' if len(keywords)>5 else ''}")
     yield _evt("info", f"Target: exactly {target_leads} leads with valid emails")
-    yield _evt("info", f"Strategy: Channel search + Video search (dual-source discovery)")
+    yield _evt("info", f"Strategy: Channel search + Video search (dual-source) + {len(niche_suffixes)} title-style queries")
 
     api_index = 0
     youtube, api_index = _get_youtube(api_index)
     notion    = NotionManager()
 
     seen_ids         = set()
-    blacklist_hits   = [0]     # list so _process_channel can mutate it
+    blacklist_hits   = [0]
     qualified        = []
-    channels_scanned = [0]     # same reason
+    channels_scanned = [0]
     target_reached   = False
 
+    # Build keyword-location pairs
+    # Solution 2: interleave city queries between regular queries
     keyword_location_pairs = []
     for keyword in keywords:
         for loc in loc_list:
             keyword_location_pairs.append((keyword, loc if loc else "Global"))
+        # Add city-drilled variants
+        for city in city_list:
+            keyword_location_pairs.append((f"{keyword} {city}", city))
 
     yield _evt("info", f"{len(keyword_location_pairs)} keyword-location combinations queued")
 
@@ -348,12 +392,19 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
 
         # ──────────────────────────────────────────────────────────
         # PHASE A: YouTube Channel Search
+        # Solution 1: resume from saved page token (not page 1 every time)
+        # Solution 3: apply date filter if set
         # ──────────────────────────────────────────────────────────
-        yield _evt("info", f"  Phase A: channel search…")
-        next_page = None
-        page_num  = 0
+        # Load saved token — continues from where last run left off
+        saved_token = get_token(query, loc)
+        next_page   = saved_token
+        page_num    = 0
+        if saved_token:
+            yield _evt("info", f"  Phase A: channel search (resuming from saved page token)…")
+        else:
+            yield _evt("info", f"  Phase A: channel search (starting from page 1)…")
 
-        while len(qualified) < target_leads and page_num < 12:
+        while len(qualified) < target_leads and page_num < 15:
             try:
                 params = {
                     "part":             "snippet",
@@ -364,10 +415,15 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
                 }
                 if next_page:
                     params["pageToken"] = next_page
+                # Solution 3: date filter on channel search
+                if published_after:
+                    params["publishedBefore"] = None  # not supported on channel search
+                    # Date filter applied in Phase B video search instead
 
                 resp  = youtube.search().list(**params).execute()
                 items = resp.get("items", [])
                 if not items:
+                    save_token(query, loc, None)  # reset — exhausted
                     break
 
             except Exception as e:
@@ -405,6 +461,8 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
             if target_reached:
                 break
             next_page = resp.get("nextPageToken")
+            # Solution 1: save token after each page so next run continues here
+            save_token(query, loc, next_page)
             if not next_page:
                 break
             page_num += 1
@@ -418,32 +476,55 @@ def scrape_leads(niche_key: str, location_key: str, sub_range_key: str, max_lead
         # PHASE B: YouTube Video Search → extract channel IDs
         # YouTube video search surfaces completely different creators
         # than channel search — smaller, niche, less algorithm-favoured
+        # Solution 4: niche suffixes produce title-style queries that
+        # surface creators who wouldn't appear in channel search at all.
         # ──────────────────────────────────────────────────────────
         if len(qualified) < target_leads:
             yield _evt("info", f"  Phase B: video search (different creator pool)…")
 
-            # Sweep 1: relevance-ordered (broad pool)
-            video_ids_broad = _video_search_channel_ids(
-                youtube, query, max_pages=5,
-            )
-            # Sweep 2: recently uploaded (last 45 days) — finds channels that just
-            #          became active or just crossed the subscriber threshold.
-            #          These are the freshest leads no competitor has contacted yet.
-            video_ids_fresh = _video_search_channel_ids(
-                youtube, query, max_pages=4, recency_days=45,
-            )
-            # Sweep 3: slightly different query variant for more variety
-            video_ids_variant = _video_search_channel_ids(
-                youtube, query + " tips", max_pages=3,
+            # Build Phase B query list:
+            # - base query (broad relevance)
+            # - base query with date filter (freshest channels)
+            # - Solution 4: niche-specific title-style suffix queries
+            phase_b_queries = []
+
+            # Sweep 1: broad relevance (no recency filter)
+            phase_b_queries.append((query, None))
+
+            # Sweep 2: recently uploaded (Solution 3 + fresh channel discovery)
+            recency = date_filter_days if date_filter_days else 45
+            phase_b_queries.append((query, recency))
+
+            # Solution 4: niche suffixes — title-style queries find completely
+            # different creators than a plain niche keyword search
+            for suffix in niche_suffixes:
+                suffix_query = f"{query} {suffix}"
+                phase_b_queries.append((suffix_query, None))
+                # Also add a fresh variant of each suffix query
+                phase_b_queries.append((suffix_query, recency))
+
+            yield _evt(
+                "info",
+                f"  Phase B: {len(phase_b_queries)} video queries "
+                f"(1 broad + 1 fresh + {len(niche_suffixes)*2} niche-suffix sweeps)"
             )
 
-            # Merge all, preserving order, deduped
+            # Run all Phase B sweeps, collecting unique channel IDs
             all_video_cids = []
             _seen_v = set()
-            for cid in video_ids_broad + video_ids_fresh + video_ids_variant:
-                if cid not in _seen_v:
-                    _seen_v.add(cid)
-                    all_video_cids.append(cid)
+            for b_query, b_recency in phase_b_queries:
+                if len(qualified) >= target_leads:
+                    target_reached = True
+                    break
+                cids = _video_search_channel_ids(
+                    youtube, b_query,
+                    max_pages=3,
+                    recency_days=b_recency,
+                )
+                for cid in cids:
+                    if cid not in _seen_v:
+                        _seen_v.add(cid)
+                        all_video_cids.append(cid)
 
             new_cids = [c for c in all_video_cids if c not in seen_ids]
             yield _evt("info", f"  Video search found {len(new_cids)} new unique channels to check")

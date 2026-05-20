@@ -315,7 +315,11 @@ write_personalized_followup_2 = write_personalized_followup_1
 
 # ── KEYWORD VARIATION GENERATOR ───────────────────────────────
 
-def generate_keyword_variations(niche_key: str, existing_keywords: list) -> list:
+def generate_keyword_variations(
+    niche_key: str,
+    existing_keywords: list,
+    used_keywords: list = None,
+) -> list:
     """
     Generate 7 fresh YouTube search query variations for a niche.
 
@@ -324,23 +328,36 @@ def generate_keyword_variations(niche_key: str, existing_keywords: list) -> list
     Falls back to [] silently if Claude is unavailable so scraping
     continues uninterrupted with the original keywords.
 
+    used_keywords: all queries used in previous scrape runs for this niche
+                   — Claude will not repeat them (Solution 5).
+
     Why this helps:
       - Surfaces sub-niches and synonyms not in config.py
       - Uses current YouTube language patterns Claude knows
-      - Every scrape session gets slightly different angles
+      - Every scrape session gets different angles (used_keywords avoidance)
       - 7 extra queries = up to ~7x more keyword-location pairs
     """
     if not existing_keywords:
         return []
 
-    existing_str = "\n".join(f"- {k}" for k in existing_keywords[:14])
+    # Combine existing config keywords + previous-run used keywords to avoid
+    all_avoid = list(existing_keywords) + (used_keywords or [])
+    avoid_str = "\n".join(f"- {k}" for k in all_avoid[:25])
+
+    previously_note = ""
+    if used_keywords:
+        prev_str = "\n".join(f"- {k}" for k in used_keywords[:15])
+        previously_note = f"""
+Previously used queries (NEVER repeat these — generate completely different angles):
+{prev_str}
+"""
 
     prompt = f"""You help find YouTube creators in the "{niche_key}" space who post videos to attract coaching or consulting clients.
 
 Generate exactly 7 YouTube search queries that would find creators in this niche or closely related sub-niches.
-
-Do NOT repeat anything from this existing list:
-{existing_str}
+{previously_note}
+Do NOT repeat anything from this list:
+{avoid_str}
 
 Rules:
 - Each query must find people who ACTIVELY POST YouTube videos
@@ -348,11 +365,12 @@ Rules:
 - Cover sub-niches, synonyms, adjacent angles, or more specific breakdowns of "{niche_key}"
 - Keep each query 3-7 words long
 - Vary the style — some with "YouTube", some without, some more specific
+- The goal is FRESH results — explore angles NOT covered by the avoid list above
 
 Respond ONLY as a JSON array of exactly 7 strings, no explanation, no markdown:
 ["query one", "query two", "query three", "query four", "query five", "query six", "query seven"]"""
 
-    raw = call_claude(prompt, max_tokens=250)
+    raw = call_claude(prompt, max_tokens=300)
     if not raw:
         return []
 
@@ -364,9 +382,9 @@ Respond ONLY as a JSON array of exactly 7 strings, no explanation, no markdown:
         variations = json.loads(raw[start:end])
         if isinstance(variations, list):
             clean = [v.strip() for v in variations if isinstance(v, str) and v.strip()]
-            # Remove any that are too close to existing keywords (basic dedup)
-            existing_lower = {k.lower() for k in existing_keywords}
-            return [v for v in clean if v.lower() not in existing_lower]
+            # Remove any that are too close to existing/used keywords (dedup)
+            avoid_lower = {k.lower() for k in all_avoid}
+            return [v for v in clean if v.lower() not in avoid_lower]
     except Exception:
         pass
 

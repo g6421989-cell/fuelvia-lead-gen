@@ -473,3 +473,74 @@ SUBSCRIBER_RANGES = {
     "500 - 2,000 (Nano)":            (500,      2_000),
     "50,000 - 100,000 (Large)":      (50_000, 100_000),
 }
+
+
+# ════════════════════════════════════════════════════════════════════
+# FRESHNESS FILTER
+# Filter YouTube results to channels that uploaded recently.
+# "Any time" = no filter (YouTube's default relevance ranking)
+# Other values = publishedAfter filter → surfaces NEW active channels
+# ════════════════════════════════════════════════════════════════════
+FRESHNESS_OPTIONS = {
+    "Any time (default)":    None,
+    "Last 7 days":           7,
+    "Last 30 days":          30,
+    "Last 90 days":          90,
+    "Last 180 days":         180,
+}
+
+
+# ════════════════════════════════════════════════════════════════════
+# CITY DRILLING — USA + UK + Canada + Australia
+# When enabled, scraper appends city names to every keyword query.
+# Each city produces a unique result pool of local creators.
+# ════════════════════════════════════════════════════════════════════
+CITY_DRILL_OPTIONS = {
+    "🇺🇸 USA Cities (50)": [
+        "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
+        "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose",
+        "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte",
+        "Indianapolis", "San Francisco", "Seattle", "Denver", "Nashville",
+        "Oklahoma City", "Portland", "Las Vegas", "Memphis", "Louisville",
+        "Baltimore", "Milwaukee", "Albuquerque", "Tucson", "Fresno",
+        "Sacramento", "Mesa", "Kansas City", "Atlanta", "Miami",
+        "Raleigh", "Minneapolis", "Cleveland", "Wichita", "Arlington",
+        "Tampa", "New Orleans", "Bakersfield", "Honolulu", "Anaheim",
+        "Aurora", "Santa Ana", "Corpus Christi", "Riverside", "St Louis",
+    ],
+    "🇬🇧 UK Cities (20)": [
+        "London", "Birmingham", "Manchester", "Leeds", "Liverpool",
+        "Sheffield", "Bristol", "Glasgow", "Edinburgh", "Leicester",
+        "Nottingham", "Newcastle", "Cardiff", "Belfast", "Southampton",
+        "Brighton", "Plymouth", "Stoke", "Coventry", "Derby",
+    ],
+    "🇨🇦 Canada Cities (15)": [
+        "Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton",
+        "Ottawa", "Winnipeg", "Quebec City", "Hamilton", "Kitchener",
+        "London Ontario", "Victoria", "Halifax", "Oshawa", "Windsor",
+    ],
+    "🇦🇺 Australia Cities (10)": [
+        "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide",
+        "Gold Coast", "Canberra", "Hobart", "Darwin", "Newcastle NSW",
+    ],
+    "Disabled (use location filter only)": [],
+}
+
+
+# ════════════════════════════════════════════════════════════════════
+# VIDEO SEARCH SUFFIXES — per niche
+# These are appended to base keywords to produce title-style queries
+# that surface creators who never appear in channel search results.
+# ════════════════════════════════════════════════════════════════════
+VIDEO_SEARCH_SUFFIXES = {
+    "real_estate":        ["tour", "walkthrough", "listing", "vlog", "investing tips", "market update", "for sale"],
+    "saas_tech":          ["demo", "tutorial", "review", "walkthrough", "how to use", "setup guide"],
+    "business_finance":   ["tips", "advice", "strategy", "how I", "lessons learned", "my story"],
+    "marketing_agency":   ["tutorial", "case study", "how to", "strategy", "results", "breakdown"],
+    "coaching_courses":   ["course", "training", "coaching call", "advice", "tips", "webinar"],
+    "travel_vlog":        ["vlog", "travel day", "itinerary", "trip", "explore", "hidden gems"],
+    "podcast_video":      ["episode", "interview", "conversation", "discussion", "reaction"],
+    "fitness_health":     ["workout", "routine", "tips", "transformation", "diet", "challenge"],
+    "education":          ["explained", "tutorial", "lesson", "how to", "study", "guide"],
+    "other":              ["tips", "tutorial", "how to", "guide", "review"],
+}
