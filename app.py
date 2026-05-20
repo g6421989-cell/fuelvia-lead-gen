@@ -1581,12 +1581,14 @@ def handle_403(e):
 # ── Entry point ────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import os as _os
     from config import YOUTUBE_APIS as _YT_KEYS
+    _port = int(_os.environ.get("PORT", 5000))  # Render sets $PORT; local defaults to 5000
     print("\n" + "=" * 52)
     print(f"  [OK] {len(_YT_KEYS)} YouTube API key(s) loaded - rotation enabled")
     print("\n" + "=" * 52)
     print("  FUELVIA Lead Generation Dashboard")
-    print("  Open:     http://127.0.0.1:5000")
+    print(f"  Open:     http://127.0.0.1:{_port}")
     print("  Password: fuelvia2025")
     print("=" * 52 + "\n")
-    app.run(debug=False, threaded=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, threaded=True, host="0.0.0.0", port=_port)
