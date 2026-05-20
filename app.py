@@ -1493,6 +1493,81 @@ def api_stop_email_action():
     return jsonify({"success": True})
 
 
+# ── Keep-alive ping (prevents Render free-tier sleep) ─────────
+
+@app.route("/api/ping")
+def api_ping():
+    """Browser pings this every 5 minutes to keep Render awake during campaigns."""
+    return jsonify({"ok": True, "ts": _ts()})
+
+
+# ── CRM Activity History ───────────────────────────────────────
+
+@app.route("/api/activity-crm")
+def api_activity_crm():
+    """
+    Returns compact CRM history for all 3 campaign actions.
+    Pulls from Notion — persists across server restarts and deploys.
+    """
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        leads   = [_extract_full_lead(r) for r in records]
+
+        sent_emails, followups, replies = [], [], []
+
+        for l in leads:
+            status = l.get("status", "New")
+
+            # ── Cold emails sent ──
+            if status not in ("New", ""):
+                sent_emails.append({
+                    "channel":   l.get("channel_name") or "—",
+                    "to_email":  l.get("email") or "—",
+                    "from_acct": l.get("email_sent_from") or "—",
+                    "date":      (l.get("last_contact") or l.get("date_added") or "").split("T")[0],
+                    "preview":   (l.get("day1_email_body") or "")[:120].strip(),
+                    "status":    status,
+                    "yt_url":    l.get("youtube_url") or "",
+                })
+
+            # ── Follow-ups sent ──
+            if l.get("day2_sent"):
+                followups.append({
+                    "channel":   l.get("channel_name") or "—",
+                    "to_email":  l.get("email") or "—",
+                    "from_acct": l.get("email_sent_from") or "—",
+                    "date":      (l.get("last_contact") or "").split("T")[0],
+                    "status":    status,
+                    "yt_url":    l.get("youtube_url") or "",
+                })
+
+            # ── Replies received ──
+            if l.get("replied"):
+                replies.append({
+                    "channel":       l.get("channel_name") or "—",
+                    "from_email":    l.get("email") or "—",
+                    "reply_date":    (l.get("reply_date") or "").split("T")[0],
+                    "reply_preview": (l.get("reply_message") or "")[:150].strip(),
+                    "yt_url":        l.get("youtube_url") or "",
+                })
+
+        # Most recent first
+        sent_emails.sort(key=lambda x: x["date"], reverse=True)
+        followups.sort(key=lambda x: x["date"], reverse=True)
+        replies.sort(key=lambda x: x["reply_date"], reverse=True)
+
+        return jsonify({
+            "sent_emails": sent_emails[:100],
+            "followups":   followups[:100],
+            "replies":     replies[:100],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Admin remote update ────────────────────────────────────────
 
 @app.route("/admin/change", methods=["POST"])
@@ -1698,15 +1773,60 @@ def handle_403(e):
 
 # ── Entry point ────────────────────────────────────────────────
 
+def _startup_checks():
+    """Run at boot — log config health and warm up critical systems."""
+    import os as _os
+    from config import YOUTUBE_APIS as _YT_KEYS, NOTION_API_KEY, NOTION_DATABASE_ID, ANTHROPIC_API_KEY
+    print("=" * 56)
+    print("  FUELVIA Lead Generation System — Starting Up")
+    print("=" * 56)
+
+    # YouTube API keys
+    if _YT_KEYS:
+        print(f"  ✅ YouTube API: {len(_YT_KEYS)} key(s) loaded")
+    else:
+        print("  ❌ YouTube API: NO KEYS — add YOUTUBE_API_1 in env vars")
+
+    # Notion
+    if NOTION_API_KEY and NOTION_DATABASE_ID:
+        print("  ✅ Notion: configured")
+    else:
+        print("  ❌ Notion: MISSING KEY or DATABASE_ID")
+
+    # Claude
+    if ANTHROPIC_API_KEY:
+        print("  ✅ Claude API: configured")
+    else:
+        print("  ⚠  Claude API: not set — fallback email templates will be used")
+
+    # Email accounts
+    print(f"  ✅ Email accounts: {len(OUTREACH_ACCOUNTS)} loaded")
+    for acc in OUTREACH_ACCOUNTS:
+        print(f"       • {acc['email']}")
+
+    # SQLite check
+    try:
+        from channel_blacklist import blacklist_size
+        bl = blacklist_size()
+        print(f"  ✅ Blacklist DB: {bl} channels")
+    except Exception as e:
+        print(f"  ⚠  Blacklist DB: {e}")
+
+    try:
+        from daily_send_limit import reset_expired, get_today_count
+        reset_expired()
+        print("  ✅ Daily send limits: OK")
+    except Exception as e:
+        print(f"  ⚠  Daily send limits: {e}")
+
+    print("=" * 56)
+
+
 if __name__ == "__main__":
     import os as _os
-    from config import YOUTUBE_APIS as _YT_KEYS
     _port = int(_os.environ.get("PORT", 5000))  # Render sets $PORT; local defaults to 5000
-    print("\n" + "=" * 52)
-    print(f"  [OK] {len(_YT_KEYS)} YouTube API key(s) loaded - rotation enabled")
-    print("\n" + "=" * 52)
-    print("  FUELVIA Lead Generation Dashboard")
+    _startup_checks()
     print(f"  Open:     http://127.0.0.1:{_port}")
-    print("  Password: fuelvia2025")
-    print("=" * 52 + "\n")
+    print(f"  Password: fuelvia2025")
+    print("=" * 56 + "\n")
     app.run(debug=False, threaded=True, host="0.0.0.0", port=_port)

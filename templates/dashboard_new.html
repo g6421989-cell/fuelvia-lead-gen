@@ -251,21 +251,38 @@
             <div class="action-header-bar">
                 <div>
                     <div class="action-header-name" id="action-title">Campaign</div>
-                    <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="action-subtitle">Starting…</div>
+                    <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="action-subtitle">Select a campaign from the left sidebar</div>
                 </div>
                 <button class="btn btn-danger hidden" id="btn-stop-action" onclick="stopEmailAction()" style="margin-left:auto;">⏹ Stop</button>
             </div>
+
+            <!-- Keep-alive warning (shown only when running) -->
+            <div id="keepalive-warn" style="display:none;background:#2a1a00;border:1px solid #5a3a00;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#f2c94c;">
+                ⚠ <strong>Keep this tab open</strong> while the campaign is running. Closing the browser will pause sending.
+            </div>
+
             <div class="card">
                 <div class="card-title" style="padding-bottom:14px;margin-bottom:16px;">Live Activity
                     <span style="margin-left:auto;"><span class="status-badge"><span class="status-dot idle" id="action-status-dot"></span><span id="action-status-text">Idle</span></span></span>
                 </div>
                 <div class="progress-container" style="margin-top:0;">
-                    <div class="progress-header"><span id="action-progress-label" style="font-size:12px;color:var(--mid);">Waiting…</span><span id="action-progress-text" style="font-size:12px;font-weight:600;"></span></div>
+                    <div class="progress-header"><span id="action-progress-label" style="font-size:12px;color:var(--mid);">Ready</span><span id="action-progress-text" style="font-size:12px;font-weight:600;"></span></div>
                     <div class="progress-bar"><div class="progress-fill" id="action-progress-fill" style="width:0%"></div></div>
                 </div>
                 <div style="margin-top:20px;">
                     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mid);margin-bottom:10px;">Live Log</div>
-                    <div class="logs-box" id="action-logs"><div class="log-entry">Waiting…</div></div>
+                    <div class="logs-box" id="action-logs"><div class="log-entry" style="color:#555;">Click a campaign button on the left to start.</div></div>
+                </div>
+            </div>
+
+            <!-- CRM History Card -->
+            <div class="card" id="crm-history-card">
+                <div class="card-title" style="padding-bottom:14px;margin-bottom:0;">
+                    Campaign History
+                    <span id="crm-history-count" style="font-size:12px;color:var(--mid);font-weight:400;margin-left:8px;"></span>
+                </div>
+                <div id="crm-history-content">
+                    <div style="padding:20px 0;text-align:center;color:var(--mid);font-size:13px;">Loading history…</div>
                 </div>
             </div>
         </div>
@@ -485,6 +502,7 @@ function switchTab(name,el){
     if(name==='scraper')loadScraperOptions();
     if(name==='analytics')loadAnalyticsTab();
     if(name==='history')loadHistory();
+    if(name==='outreach')loadCrmHistory();
 }
 
 function loadDashboard(){
@@ -695,9 +713,52 @@ function updateScraperStatus(){
     }).catch(function(){});
 }
 
+// ── CRM History ─────────────────────────────────────────────────
+var _crmAction='send_emails';
+function loadCrmHistory(action){
+    _crmAction=action||_crmAction;
+    fetch('/api/activity-crm').then(function(r){return r.json();}).then(function(d){
+        if(d.error){document.getElementById('crm-history-content').innerHTML='<div style="padding:16px;color:#888;font-size:13px;">Could not load history.</div>';return;}
+        var rows=[],items=[],cols=[];
+        if(_crmAction==='send_emails'){
+            items=d.sent_emails||[];
+            cols=['Channel','Sent To','Sent From','Date','Status','Email Preview'];
+            rows=items.map(function(e){
+                var prev=e.preview?('<span style="color:#888;font-size:11px;">'+_esc(e.preview.substring(0,90))+(e.preview.length>90?'…':'')+'</span>'):'<span style="color:#555;font-size:11px;">—</span>';
+                var ytLink=e.yt_url?('<a href="'+e.yt_url+'" target="_blank" style="color:#888;font-size:11px;margin-left:4px;">↗</a>'):'';
+                return '<tr><td>'+_esc(e.channel)+ytLink+'</td><td style="font-size:12px;">'+_esc(e.to_email)+'</td><td style="font-size:11px;color:#888;">'+_esc(e.from_acct)+'</td><td style="font-size:12px;white-space:nowrap;">'+_esc(e.date)+'</td><td>'+_statusBadge(e.status)+'</td><td style="max-width:260px;">'+prev+'</td></tr>';
+            });
+        } else if(_crmAction==='send_followup'){
+            items=d.followups||[];
+            cols=['Channel','Sent To','Sent From','Date','Status'];
+            rows=items.map(function(e){
+                var ytLink=e.yt_url?('<a href="'+e.yt_url+'" target="_blank" style="color:#888;font-size:11px;margin-left:4px;">↗</a>'):'';
+                return '<tr><td>'+_esc(e.channel)+ytLink+'</td><td style="font-size:12px;">'+_esc(e.to_email)+'</td><td style="font-size:11px;color:#888;">'+_esc(e.from_acct)+'</td><td style="font-size:12px;white-space:nowrap;">'+_esc(e.date)+'</td><td>'+_statusBadge(e.status)+'</td></tr>';
+            });
+        } else {
+            items=d.replies||[];
+            cols=['Channel','Reply From','Date','Reply Preview'];
+            rows=items.map(function(e){
+                var prev=e.reply_preview?('<span style="color:#f2c94c;font-size:11px;">'+_esc(e.reply_preview.substring(0,120))+(e.reply_preview.length>120?'…':'')+'</span>'):'<span style="color:#555;font-size:11px;">—</span>';
+                var ytLink=e.yt_url?('<a href="'+e.yt_url+'" target="_blank" style="color:#888;font-size:11px;margin-left:4px;">↗</a>'):'';
+                return '<tr><td>'+_esc(e.channel)+ytLink+'</td><td style="font-size:12px;">'+_esc(e.from_email)+'</td><td style="font-size:12px;white-space:nowrap;">'+_esc(e.reply_date)+'</td><td style="max-width:320px;">'+prev+'</td></tr>';
+            });
+        }
+        document.getElementById('crm-history-count').textContent='('+items.length+' records)';
+        if(!rows.length){
+            document.getElementById('crm-history-content').innerHTML='<div style="padding:20px 0;text-align:center;color:#555;font-size:13px;">No history yet for this action.</div>';
+            return;
+        }
+        var hdr=cols.map(function(c){return'<th>'+c+'</th>';}).join('');
+        document.getElementById('crm-history-content').innerHTML='<div style="overflow-x:auto;"><table><thead><tr>'+hdr+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+    }).catch(function(){});
+}
+function _esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _statusBadge(s){var m={'New':'badge-new','Contacted':'badge-contacted','Replied':'badge-replied','Follow-up 1':'badge-follow-up-1','Follow-up Sent':'badge-follow-up-sent','Closed':'badge-closed'};return'<span class="badge '+(m[s]||'badge-new')+'">'+_esc(s||'New')+'</span>';}
+
 function _setSidebarBtnActive(id){['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(function(b){var el=document.getElementById(b);if(el)el.classList.remove('active-action');});var t=document.getElementById(id);if(t)t.classList.add('active-action');}
 
-function _openOutreachTab(label){
+function _openOutreachTab(label, action){
     document.querySelectorAll('.tab-content').forEach(function(t){t.classList.add('hidden');});
     document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
     document.getElementById('tab-outreach').classList.remove('hidden');
@@ -711,12 +772,14 @@ function _openOutreachTab(label){
     document.getElementById('action-status-dot').className='status-dot running';
     document.getElementById('action-status-text').textContent='RUNNING';
     document.getElementById('btn-stop-action').classList.remove('hidden');
+    document.getElementById('keepalive-warn').style.display='block';
+    loadCrmHistory(action||'send_emails');
 }
 
-function runSendEmails(){fetch('/api/send-emails',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-emails');_openOutreachTab('Send Emails');});}
-function runSendFollowup(){fetch('/api/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-followup');_openOutreachTab('Send Follow-ups');});}
-function runCheckReplies(){fetch('/api/check-replies',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-check-replies');_openOutreachTab('Check Replies');});}
-function stopEmailAction(){fetch('/api/stop-email-action',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(!d.success)_toast('Could not stop action','error');document.getElementById('btn-stop-action').classList.add('hidden');});}
+function runSendEmails(){fetch('/api/send-emails',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-emails');_openOutreachTab('Send Emails','send_emails');});}
+function runSendFollowup(){fetch('/api/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-send-followup');_openOutreachTab('Send Follow-ups','send_followup');});}
+function runCheckReplies(){fetch('/api/check-replies',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(d.error){_toast('Error: '+d.error,'error');return;}_setSidebarBtnActive('sbtn-check-replies');_openOutreachTab('Check Replies','check_replies');});}
+function stopEmailAction(){fetch('/api/stop-email-action',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){if(!d.success)_toast('Could not stop action','error');document.getElementById('btn-stop-action').classList.add('hidden');document.getElementById('keepalive-warn').style.display='none';});}
 
 function updateOutreachStatus(){
     fetch('/api/email-action-status').then(function(r){return r.json();}).then(function(d){
@@ -727,11 +790,16 @@ function updateOutreachStatus(){
         if(d.total>0){var done=Math.round(pct/100*d.total);document.getElementById('action-progress-text').textContent=done+' / '+d.total;}
         var sm={send_emails:'Cold emailing New leads',send_followup:'Following up Contacted leads',check_replies:'Scanning inboxes'};
         if(d.action)document.getElementById('action-subtitle').textContent=sm[d.action]||d.action;
-        var lm={running:'In progress…',completed:'All done!',stopped:'Stopped.',error:'Error.',idle:'Waiting…'};
+        var lm={running:'In progress…',completed:'All done! ✅',stopped:'Stopped.',error:'Error — see log.',idle:'Ready'};
         document.getElementById('action-progress-label').textContent=lm[status]||status;
         document.getElementById('btn-stop-action').classList.toggle('hidden',status!=='running');
+        document.getElementById('keepalive-warn').style.display=(status==='running'?'block':'none');
         if(d.logs&&d.logs.length){var le=document.getElementById('action-logs');le.innerHTML=d.logs.map(function(line){var cls=line.includes('✅')||line.includes('🏁')?'log-ok':line.includes('❌')?'log-err':line.includes('⚠')?'log-warn':'';return'<div class="log-entry '+cls+'">'+line+'</div>';}).join('');le.scrollTop=le.scrollHeight;}
-        if(status==='completed'||status==='stopped'){loadDashboard();_analyticsDataCache=null;['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(function(b){var el=document.getElementById(b);if(el)el.classList.remove('active-action');});}
+        if(status==='completed'||status==='stopped'){
+            loadDashboard();_analyticsDataCache=null;
+            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(function(b){var el=document.getElementById(b);if(el)el.classList.remove('active-action');});
+            loadCrmHistory();  // refresh history after campaign ends
+        }
     }).catch(function(){});
 }
 
@@ -739,6 +807,8 @@ function startPolling(){
     setInterval(loadDashboard,15000);
     setInterval(function(){var a=document.querySelector('.tab-content:not(.hidden)');if(a&&a.id==='tab-scraper')updateScraperStatus();},3000);
     setInterval(function(){var a=document.querySelector('.tab-content:not(.hidden)');if(a&&a.id==='tab-outreach')updateOutreachStatus();},2000);
+    // Keep-alive ping every 5 minutes — prevents Render free-tier from sleeping during long email campaigns
+    setInterval(function(){fetch('/api/ping').catch(function(){});},300000);
 }
 
 function handleLogout(){
