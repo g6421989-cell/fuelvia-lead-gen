@@ -13,22 +13,30 @@
 import requests
 import json
 import random
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+import settings_store
 from config import SENDER_NAME, COMPANY_NAME
 
 
 # ── API ────────────────────────────────────────────────────────
 
 def call_claude(prompt: str, max_tokens: int = 600) -> str | None:
+    # Read LIVE from settings store so UI changes apply without restart
+    api_key  = settings_store.get("CLAUDE_API_KEY")
+    base_url = settings_store.get("CLAUDE_BASE_URL")
+    model    = settings_store.get("CLAUDE_MODEL")
+
+    if not api_key:
+        print("  [ERROR] Claude API key not set (configure in Settings)")
+        return None
     try:
         response = requests.post(
-            "https://api.aicredits.in/v1/chat/completions",
+            base_url,
             headers={
-                "Authorization": "Bearer " + ANTHROPIC_API_KEY,
+                "Authorization": "Bearer " + api_key,
                 "Content-Type": "application/json",
             },
             json={
-                "model": CLAUDE_MODEL,
+                "model": model,
                 "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": prompt}],
             },

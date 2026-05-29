@@ -171,6 +171,28 @@
         .info-box { background: var(--white); border: 1px solid var(--light); border-left: 3px solid var(--black); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; color: var(--charcoal); line-height: 1.6; }
         .info-box strong { color: var(--black); }
 
+        /* ── SETTINGS ────────────────────────────────────────────────── */
+        .settings-banner { padding: 14px 20px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
+        .settings-banner.ok   { background: #eaf5ee; border: 1px solid #2d6a4f; color: #1b4332; }
+        .settings-banner.err  { background: #f9eaea; border: 1px solid #7b2d2d; color: #5a1f1f; }
+        .settings-group-title { font-family: var(--serif); font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+        .setting-field { margin-bottom: 18px; }
+        .setting-field label { display: block; font-size: 12px; font-weight: 600; color: var(--charcoal); margin-bottom: 6px; }
+        .setting-field input, .setting-field textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--light); border-radius: 6px;
+            font-family: var(--body); font-size: 13px; background: var(--offwhite); color: var(--black);
+            transition: border-color 0.15s;
+        }
+        .setting-field input:focus, .setting-field textarea:focus { outline: none; border-color: var(--black); background: var(--white); }
+        .setting-field textarea { min-height: 90px; resize: vertical; font-family: monospace; font-size: 12px; }
+        .setting-meta { font-size: 10.5px; color: var(--mid); margin-top: 4px; display: flex; gap: 8px; align-items: center; }
+        .src-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
+        .src-saved   { background: #eaf5ee; color: #2d6a4f; }
+        .src-env     { background: #eef0f5; color: #3a4a6b; }
+        .src-default { background: #f5f0e8; color: #7a5c00; }
+        .settings-card-actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+        .test-result { font-size: 12px; font-weight: 600; }
+
         /* ── INTELLIGENCE ────────────────────────────────────────────── */
         .niche-card { background: var(--offwhite); border: 1px solid var(--light); border-radius: 6px; padding: 16px; }
         .niche-card-name { font-weight: 700; font-size: 13.5px; margin-bottom: 8px; }
@@ -299,6 +321,9 @@
             </div>
             <div class="nav-item" onclick="switchTab('scraper', this)">
                 <span class="nav-icon">▷</span> Scraper
+            </div>
+            <div class="nav-item" onclick="switchTab('settings', this)">
+                <span class="nav-icon">⚙</span> Settings
             </div>
         </div>
 
@@ -553,6 +578,17 @@
                 </div>
             </div>
 
+            <!-- ── SETTINGS TAB ─────────────────────────────────────── -->
+            <div id="tab-settings" class="tab-content hidden">
+                <div class="info-box">
+                    <strong>⚙ Live Settings:</strong> Change API keys, base URLs &amp; limits here. Saved values take effect <strong>immediately</strong> — no restart needed. Secret keys are masked; leave a field blank to keep the existing value.
+                </div>
+                <div id="settings-status" class="settings-banner hidden"></div>
+                <div id="settings-container">
+                    <div class="card"><div class="log-entry">Loading settings…</div></div>
+                </div>
+            </div>
+
         </div><!-- /content -->
     </div><!-- /main -->
 </div><!-- /dashboard -->
@@ -605,7 +641,7 @@ function switchTab(name, el) {
     const titles = {
         overview:'Overview', leads:'All Leads', emails:'Emails Sent',
         replies:'Replies', intelligence:'Intelligence', scraper:'Scraper',
-        outreach:'Campaign Activity'
+        outreach:'Campaign Activity', settings:'Settings'
     };
     document.getElementById('page-title').textContent = titles[name] || 'Dashboard';
     if (name === 'leads')        loadLeads();
@@ -613,6 +649,84 @@ function switchTab(name, el) {
     if (name === 'replies')      loadReplies();
     if (name === 'intelligence') loadIntelligence();
     if (name === 'scraper')      loadScraperOptions();
+    if (name === 'settings')     loadSettings();
+}
+
+// ── Settings ──────────────────────────────────────────────────────────
+const _PROVIDER_BY_GROUP = { 'Claude AI':'claude', 'Notion':'notion', 'YouTube':'youtube' };
+
+function loadSettings() {
+    fetch('/api/settings').then(r => r.json()).then(d => {
+        if (!d.success) { document.getElementById('settings-container').innerHTML =
+            `<div class="card"><div class="log-entry log-err">Failed to load: ${d.error||'?'}</div></div>`; return; }
+
+        let html = '';
+        for (const [group, fields] of Object.entries(d.groups)) {
+            const provider = _PROVIDER_BY_GROUP[group];
+            html += `<div class="card"><div class="card-title settings-group-title">${group}</div>`;
+            for (const f of fields) {
+                const srcClass = 'src-' + f.source;
+                const ph = f.secret && f.has_value ? `Saved (${f.value}) — leave blank to keep` : '';
+                if (f.kind === 'list') {
+                    const val = f.secret ? '' : (f.value || '');
+                    html += `<div class="setting-field">
+                        <label>${f.label}</label>
+                        <textarea id="set-${f.key}" placeholder="${f.secret && f.has_value ? f.value+'\\n(masked — paste new keys to replace, one per line)' : 'one per line'}">${val}</textarea>
+                        <div class="setting-meta"><span class="src-tag ${srcClass}">${f.source}</span></div>
+                    </div>`;
+                } else {
+                    const val = f.secret ? '' : (f.value ?? '');
+                    html += `<div class="setting-field">
+                        <label>${f.label}</label>
+                        <input id="set-${f.key}" type="${f.secret?'password':'text'}" value="${val}" placeholder="${ph}" autocomplete="off">
+                        <div class="setting-meta"><span class="src-tag ${srcClass}">${f.source}</span></div>
+                    </div>`;
+                }
+            }
+            html += `<div class="settings-card-actions">`;
+            if (provider) html += `<button class="btn btn-secondary" onclick="testProvider('${provider}', this)">⚡ Test Connection</button>
+                <span class="test-result" id="test-${provider}"></span>`;
+            html += `</div></div>`;
+        }
+        html += `<div class="card" style="text-align:right;">
+            <button class="btn btn-primary" onclick="saveSettings()">💾 Save All Settings</button>
+        </div>`;
+        document.getElementById('settings-container').innerHTML = html;
+    });
+}
+
+function saveSettings() {
+    const inputs = document.querySelectorAll('[id^="set-"]');
+    const payload = {};
+    inputs.forEach(el => {
+        const key = el.id.replace('set-', '');
+        const v = el.value.trim();
+        if (v !== '') payload[key] = v;   // blank = keep existing
+    });
+    const banner = document.getElementById('settings-status');
+    banner.className = 'settings-banner';
+    banner.textContent = 'Saving…';
+    banner.classList.remove('hidden');
+
+    fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+    .then(r => r.json()).then(d => {
+        banner.classList.add(d.success ? 'ok' : 'err');
+        banner.textContent = d.success ? `✅ ${d.message}` : `❌ ${d.error||'Save failed'}`;
+        if (d.success) loadSettings();   // refresh source tags
+        setTimeout(() => banner.classList.add('hidden'), 5000);
+    }).catch(e => { banner.classList.add('err'); banner.textContent = '❌ ' + e; });
+}
+
+function testProvider(provider, btn) {
+    const out = document.getElementById('test-' + provider);
+    out.style.color = 'var(--mid)'; out.textContent = 'Testing…';
+    if (btn) btn.disabled = true;
+    fetch('/api/settings/test', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({provider}) })
+    .then(r => r.json()).then(d => {
+        out.style.color = d.success ? '#2d6a4f' : '#7b2d2d';
+        out.textContent = (d.success ? '✅ ' : '❌ ') + (d.message||'');
+    }).catch(e => { out.style.color = '#7b2d2d'; out.textContent = '❌ ' + e; })
+    .finally(() => { if (btn) btn.disabled = false; });
 }
 
 // ── Dashboard data ────────────────────────────────────────────────────

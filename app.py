@@ -62,6 +62,7 @@ from youtube_enricher import get_videos_for_channel, days_since_last_video
 from lead_intelligence import LeadIntelligence
 from scraper_engine import scrape_leads
 from daily_send_limit import has_room_today, increment_today_count, reset_expired
+import settings_store
 
 
 # ── App setup ──────────────────────────────────────────────────
@@ -591,6 +592,67 @@ def api_dashboard_data():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Settings (UI-editable API keys & tunables) ──────────────────
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_get():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        return jsonify({"success": True, "groups": settings_store.get_all_for_ui()})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_settings_save():
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        updates = request.get_json(force=True) or {}
+        changed = settings_store.set_many(updates)
+        settings_store.reload()  # ensure cache reflects new file
+        return jsonify({"success": True, "changed": changed,
+                        "message": f"Saved {len(changed)} setting(s). Changes are live immediately."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/settings/test", methods=["POST"])
+def api_settings_test():
+    """Live-test a provider connection with the CURRENT (saved) settings."""
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    provider = (request.get_json(force=True) or {}).get("provider", "")
+    try:
+        if provider == "claude":
+            from claude_helpers import call_claude
+            out = call_claude("Reply with the single word: OK", max_tokens=10)
+            ok = bool(out) and "ok" in out.lower()
+            return jsonify({"success": ok,
+                            "message": f"Claude responded: {out!r}" if ok
+                                       else "No valid response — check key, base URL & model."})
+
+        if provider == "notion":
+            nm = NotionManager()
+            recs = nm.get_all_leads()
+            return jsonify({"success": True,
+                            "message": f"Notion OK — database reachable, {len(recs)} record(s)."})
+
+        if provider == "youtube":
+            from scraper_engine import _get_youtube
+            yt, _ = _get_youtube(0)
+            # cheapest call: 1-unit channels.list on a known channel
+            yt.channels().list(part="id", id="UC_x5XG1OV2P6uZZ5FSM9Ttw").execute()
+            n = len(settings_store.get_list("YOUTUBE_API_KEYS"))
+            return jsonify({"success": True, "message": f"YouTube OK — {n} key(s), API reachable."})
+
+        return jsonify({"success": False, "message": f"Unknown provider: {provider}"})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"{provider} test failed: {str(e)[:200]}"})
+
+
 # ── Leads table ────────────────────────────────────────────────
 
 @app.route("/api/leads")
@@ -879,27 +941,28 @@ def api_health():
         icon = "✅" if ok else "❌"
         return f"<tr><td>{icon}</td><td><b>{label}</b></td><td style='color:#888'>{detail}</td></tr>"
 
-    # YouTube API keys
+    # YouTube API keys (LIVE from settings store)
     try:
-        from config import YOUTUBE_APIS as _yt
+        _yt = settings_store.get_list("YOUTUBE_API_KEYS")
         n = len(_yt)
         checks.append(row("YouTube API Keys", n > 0,
-            f"{n} key(s) loaded" if n > 0 else "MISSING — add YOUTUBE_API_1 … in Render env vars"))
+            f"{n} key(s) loaded" if n > 0 else "MISSING — add in Settings"))
     except Exception as e:
         checks.append(row("YouTube API Keys", False, str(e)))
 
-    # Notion
+    # Notion (LIVE)
     try:
-        from config import NOTION_API_KEY, NOTION_DATABASE_ID
-        checks.append(row("Notion API Key",     bool(NOTION_API_KEY),     "set ✓" if NOTION_API_KEY else "MISSING"))
-        checks.append(row("Notion Database ID", bool(NOTION_DATABASE_ID), "set ✓" if NOTION_DATABASE_ID else "MISSING"))
+        _nk = settings_store.get("NOTION_API_KEY")
+        _nd = settings_store.get("NOTION_DATABASE_ID")
+        checks.append(row("Notion API Key",     bool(_nk), "set ✓" if _nk else "MISSING"))
+        checks.append(row("Notion Database ID", bool(_nd), "set ✓" if _nd else "MISSING"))
     except Exception as e:
         checks.append(row("Notion", False, str(e)))
 
-    # Claude
+    # Claude (LIVE)
     try:
-        from config import ANTHROPIC_API_KEY
-        checks.append(row("Claude API Key", bool(ANTHROPIC_API_KEY), "set ✓" if ANTHROPIC_API_KEY else "MISSING (email still uses fallback templates)"))
+        _ck = settings_store.get("CLAUDE_API_KEY")
+        checks.append(row("Claude API Key", bool(_ck), "set ✓" if _ck else "MISSING (email still uses fallback templates)"))
     except Exception as e:
         checks.append(row("Claude API Key", False, str(e)))
 
@@ -1064,9 +1127,10 @@ def _run_send_emails():
 
         # ── Pick account with room (rotate past full ones) ────
         account = None
+        _daily_cap = settings_store.get("MAX_EMAILS_PER_ACCOUNT_PER_DAY")
         for _try in range(len(OUTREACH_ACCOUNTS)):
             candidate = _next_account()
-            if has_room_today(candidate["email"]):
+            if has_room_today(candidate["email"], limit=_daily_cap):
                 account = candidate
                 break
             _alog(f"[{_ts()}]    {candidate['email']} at daily limit — trying next account…")
@@ -1116,8 +1180,8 @@ def _run_send_emails():
                 _alog(f"[{_ts()}]    Next account: {next_account['email']}")
                 _alog(f"[{_ts()}]    Starting to write next email during wait time...")
 
-                # Wait 2 minutes (120 seconds) with ability to stop
-                wait_secs = EMAIL_ROTATION_DELAY
+                # Wait between sends (live-editable in Settings) with ability to stop
+                wait_secs = settings_store.get("EMAIL_ROTATION_DELAY")
                 wait_ticks = wait_secs * 2  # Each tick is 0.5 seconds
                 for tick in range(wait_ticks):
                     if _email_action_stop.is_set():
@@ -1227,7 +1291,7 @@ def _run_send_followup():
                 continue
 
             # ── Check daily limit — follow-ups must use SAME account so no rotation here ──
-            if not has_room_today(account["email"]):
+            if not has_room_today(account["email"], limit=settings_store.get("MAX_EMAILS_PER_ACCOUNT_PER_DAY")):
                 _alog(f"[{_ts()}] 🛑 [{i}/{total}] Daily limit reached for {account['email']} — skipping {cname} (will retry tomorrow)")
                 continue   # skip this lead today; don't abort the whole run
 

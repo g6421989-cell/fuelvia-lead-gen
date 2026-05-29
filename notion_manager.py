@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from datetime import datetime, date, timedelta
 import time
-from config import NOTION_API_KEY, NOTION_DATABASE_ID
+import settings_store
 
 
 def _split_rich_text(text: str, chunk: int = 1990) -> list:
@@ -20,8 +20,9 @@ def _split_rich_text(text: str, chunk: int = 1990) -> list:
 
 class NotionManager:
     def __init__(self):
-        self.api_key = NOTION_API_KEY
-        self.database_id = NOTION_DATABASE_ID
+        # Read LIVE from settings store so UI changes apply without restart
+        self.api_key = settings_store.get("NOTION_API_KEY")
+        self.database_id = settings_store.get("NOTION_DATABASE_ID")
         self.base_url = "https://api.notion.com/v1"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",

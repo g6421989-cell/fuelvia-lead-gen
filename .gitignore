@@ -11,7 +11,10 @@ build/
 .env
 .env.local
 .env.*.local
+runtime_settings.json
 *.db
 server.log
+server_test.log
+_test_*.py
 .DS_Store
 node_modules/

@@ -24,11 +24,17 @@ from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
 
 from config import (
-    YOUTUBE_APIS, NICHE_OPTIONS, NICHE_SEARCH_TERMS,
+    NICHE_OPTIONS, NICHE_SEARCH_TERMS,
     LOCATION_OPTIONS, SUBSCRIBER_RANGES,
     CITY_DRILL_OPTIONS, VIDEO_SEARCH_SUFFIXES, FRESHNESS_OPTIONS,
 )
+import settings_store
 from notion_manager import NotionManager
+
+
+def _yt_keys():
+    """Read YouTube API keys LIVE from settings store (UI-editable, no restart)."""
+    return settings_store.get_list("YOUTUBE_API_KEYS")
 from youtube_enricher import get_videos_for_channel, days_since_last_video
 from channel_qualifier import qualify_channel, extract_email_from_all_sources
 from channel_blacklist import is_blacklisted, add_to_blacklist, blacklist_size
@@ -55,9 +61,10 @@ def _evt(type_: str, message: str, data: dict = None) -> dict:
 
 
 def _get_youtube(api_index: int):
-    if not YOUTUBE_APIS:
-        raise ValueError("No YouTube API keys configured — add YOUTUBE_API_1 to environment variables.")
-    key = YOUTUBE_APIS[api_index % len(YOUTUBE_APIS)]
+    keys = _yt_keys()
+    if not keys:
+        raise ValueError("No YouTube API keys configured — add them in Settings.")
+    key = keys[api_index % len(keys)]
     return build("youtube", "v3", developerKey=key), api_index
 
 
@@ -213,7 +220,7 @@ def _process_channel(
 
     # ── Fetch video data ──────────────────────────────────────
     videos = []
-    for _attempt in range(len(YOUTUBE_APIS)):
+    for _attempt in range(len(_yt_keys())):
         try:
             videos = get_videos_for_channel(
                 youtube, cid,
@@ -223,7 +230,7 @@ def _process_channel(
             break
         except Exception as ve:
             if "quotaExceeded" in str(ve) or "403" in str(ve):
-                api_index = (api_index + 1) % len(YOUTUBE_APIS)
+                api_index = (api_index + 1) % len(_yt_keys())
                 youtube, _ = _get_youtube(api_index)
                 events.append(_evt("warning", f"Video API quota — rotated to key #{api_index + 1}"))
             else:
@@ -296,10 +303,10 @@ def scrape_leads(
       Phase B: YouTube VIDEO search    (different creator pool — title-style queries)
     """
     # ── Guard: API keys must be configured ───────────────────────────
-    if not YOUTUBE_APIS:
+    if not _yt_keys():
         yield _evt("error",
             "No YouTube API keys found. "
-            "Add YOUTUBE_API_1 (and more) to your environment variables, then restart."
+            "Add them in Settings, then start the scrape again."
         )
         yield _evt("complete", "Scrape aborted — no API keys", {
             "leads_found": 0, "channels_scanned": 0,
@@ -426,9 +433,9 @@ def scrape_leads(
 
             except Exception as e:
                 if "quotaExceeded" in str(e) or "403" in str(e):
-                    api_index = (api_index + 1) % len(YOUTUBE_APIS)
+                    api_index = (api_index + 1) % len(_yt_keys())
                     youtube, api_index = _get_youtube(api_index)
-                    yield _evt("warning", f"Search quota — rotated to key #{api_index + 1}/{len(YOUTUBE_APIS)}")
+                    yield _evt("warning", f"Search quota — rotated to key #{api_index + 1}/{len(_yt_keys())}")
                     time.sleep(1)
                     continue
                 else:
