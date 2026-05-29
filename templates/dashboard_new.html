@@ -171,6 +171,18 @@
         .info-box { background: var(--white); border: 1px solid var(--light); border-left: 3px solid var(--black); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; color: var(--charcoal); line-height: 1.6; }
         .info-box strong { color: var(--black); }
 
+        /* ── CAMPAIGN SETUP PANEL ────────────────────────────────────── */
+        .setup-pending { display: flex; align-items: baseline; gap: 10px; padding: 18px 22px; background: var(--offwhite); border: 1px solid var(--light); border-radius: 8px; margin-bottom: 22px; }
+        .setup-pending-num { font-family: var(--serif); font-size: 42px; font-weight: 700; color: var(--black); line-height: 1; }
+        .setup-pending-txt { font-size: 13px; color: var(--mid); }
+        .setup-controls { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+        .setup-field { flex: 1; min-width: 220px; }
+        .setup-field label { display: block; font-size: 12px; font-weight: 600; color: var(--charcoal); margin-bottom: 7px; }
+        .setup-field input { width: 100%; padding: 12px 14px; border: 1px solid var(--light); border-radius: 6px; font-family: var(--body); font-size: 18px; font-weight: 600; background: var(--white); color: var(--black); }
+        .setup-field input:focus { outline: none; border-color: var(--black); }
+        .setup-hint { font-size: 11px; color: var(--mid); margin-top: 6px; }
+        .setup-actions { display: flex; gap: 10px; }
+
         /* ── SETTINGS ────────────────────────────────────────────────── */
         .settings-banner { padding: 14px 20px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
         .settings-banner.ok   { background: #eaf5ee; border: 1px solid #2d6a4f; color: #1b4332; }
@@ -398,13 +410,34 @@
 
                 <div class="action-header-bar">
                     <div>
-                        <div class="action-header-name" id="action-title">Campaign Running</div>
-                        <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="action-subtitle">Starting…</div>
+                        <div class="action-header-name" id="action-title">Campaign</div>
+                        <div style="font-size:11px;color:var(--mid);margin-top:4px;" id="action-subtitle">Configure below</div>
                     </div>
                     <button class="btn btn-danger hidden" id="btn-stop-action" onclick="stopEmailAction()" style="margin-left:auto;">⏹ Stop</button>
                 </div>
 
-                <div class="card">
+                <!-- SETUP PANEL — shown before sending -->
+                <div class="card" id="outreach-setup">
+                    <div class="card-title" style="padding-bottom:14px;margin-bottom:16px;" id="setup-title">Campaign Setup</div>
+                    <div class="setup-pending" id="setup-pending">
+                        <span class="setup-pending-num" id="setup-pending-num">—</span>
+                        <span class="setup-pending-txt" id="setup-pending-txt">pending</span>
+                    </div>
+                    <div class="setup-controls">
+                        <div class="setup-field">
+                            <label for="setup-count">How many to send now?</label>
+                            <input type="number" id="setup-count" min="1" value="1" oninput="_clampSetupCount()">
+                            <div class="setup-hint" id="setup-hint">Leave at the max to send all pending.</div>
+                        </div>
+                        <div class="setup-actions">
+                            <button class="btn btn-secondary" onclick="setSendAll()" id="btn-send-all">Send All</button>
+                            <button class="btn btn-primary" onclick="startEmailAction()" id="btn-start-send">▷ Start Sending</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE PANEL — shown while running -->
+                <div class="card hidden" id="outreach-live">
                     <div class="card-title" style="padding-bottom:14px;margin-bottom:16px;">
                         Live Activity
                         <span id="action-status-wrap" style="margin-left:auto;">
@@ -964,14 +997,97 @@ function _setSidebarBtnActive(id) {
     if (target) target.classList.add('active-action');
 }
 
-function _openOutreachTab(actionLabel) {
-    // Switch to outreach tab (no nav-item to mark active)
+// Tracks which campaign the setup screen is configuring
+let _pendingAction = null;   // { endpoint, sidebarBtn, liveLabel }
+let _setupMax = 0;
+
+function _showOutreachTab() {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('tab-outreach').classList.remove('hidden');
     document.getElementById('page-title').textContent = 'Campaign Activity';
-    document.getElementById('action-title').textContent = actionLabel;
-    document.getElementById('action-subtitle').textContent = 'Starting…';
+}
+
+// ── Open the SETUP screen (does NOT send) ─────────────────────────────
+function _openOutreachSetup(opts) {
+    _pendingAction = opts;
+    _showOutreachTab();
+    _setSidebarBtnActive(opts.sidebarBtn);
+
+    // Show setup, hide live
+    document.getElementById('outreach-setup').classList.remove('hidden');
+    document.getElementById('outreach-live').classList.add('hidden');
+    document.getElementById('btn-stop-action').classList.add('hidden');
+
+    document.getElementById('action-title').textContent = opts.title;
+    document.getElementById('action-subtitle').textContent = 'Choose how many to send, then press Start';
+    document.getElementById('setup-title').textContent = opts.title + ' — Setup';
+    document.getElementById('setup-pending-num').textContent = '…';
+    document.getElementById('setup-pending-txt').textContent = opts.pendingTxt;
+
+    const startBtn = document.getElementById('btn-start-send');
+    startBtn.disabled = true; startBtn.textContent = 'Loading…';
+
+    // Fetch live pending counts
+    fetch('/api/campaign-counts').then(r => r.json()).then(d => {
+        const n = (opts.countKey === 'cold') ? d.cold_pending : d.followup_pending;
+        _setupMax = n || 0;
+        document.getElementById('setup-pending-num').textContent = _setupMax;
+        const input = document.getElementById('setup-count');
+        input.max = Math.max(1, _setupMax);
+        input.value = _setupMax > 0 ? _setupMax : 0;
+        document.getElementById('setup-hint').textContent =
+            _setupMax > 0 ? `Max ${_setupMax}. Lower it to send only a batch (e.g. 10 of ${_setupMax}).`
+                          : 'Nothing pending right now.';
+        startBtn.disabled = _setupMax < 1;
+        startBtn.textContent = _setupMax < 1 ? 'Nothing to send' : '▷ Start Sending';
+    }).catch(e => {
+        document.getElementById('setup-pending-num').textContent = '!';
+        document.getElementById('setup-hint').textContent = 'Could not load counts: ' + e.message;
+    });
+}
+
+function _clampSetupCount() {
+    const input = document.getElementById('setup-count');
+    let v = parseInt(input.value, 10);
+    if (isNaN(v)) return;
+    if (v < 1) v = 1;
+    if (_setupMax && v > _setupMax) v = _setupMax;
+    input.value = v;
+}
+
+function setSendAll() {
+    const input = document.getElementById('setup-count');
+    input.value = _setupMax > 0 ? _setupMax : 0;
+}
+
+// ── Actually START sending (called by the Start button) ───────────────
+function startEmailAction() {
+    if (!_pendingAction || _setupMax < 1) return;
+    _clampSetupCount();
+    const limit = parseInt(document.getElementById('setup-count').value, 10) || _setupMax;
+
+    const startBtn = document.getElementById('btn-start-send');
+    startBtn.disabled = true; startBtn.textContent = 'Starting…';
+
+    fetch(_pendingAction.endpoint, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ limit: limit })
+    }).then(r => r.json()).then(d => {
+        startBtn.disabled = false; startBtn.textContent = '▷ Start Sending';
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _switchToLive(`${_pendingAction.title} — sending ${limit}`);
+    }).catch(e => {
+        startBtn.disabled = false; startBtn.textContent = '▷ Start Sending';
+        alert('Error: ' + e.message);
+    });
+}
+
+// ── Switch from setup view to the live progress view ─────────────────
+function _switchToLive(subtitle) {
+    document.getElementById('outreach-setup').classList.add('hidden');
+    document.getElementById('outreach-live').classList.remove('hidden');
+    document.getElementById('action-subtitle').textContent = subtitle || 'Starting…';
     document.getElementById('action-logs').innerHTML = '<div class="log-entry">Starting…</div>';
     document.getElementById('action-progress-fill').style.width = '0%';
     document.getElementById('action-progress-text').textContent = '';
@@ -981,32 +1097,31 @@ function _openOutreachTab(actionLabel) {
     document.getElementById('btn-stop-action').classList.remove('hidden');
 }
 
+// ── Sidebar buttons now OPEN SETUP (no auto-send) ─────────────────────
 function runSendEmails() {
-    if (!confirm('Send cold emails to all "New" leads?\n\nClaude will re-fetch YouTube data and write personalised emails. You can watch progress live.')) return;
-    fetch('/api/send-emails', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
-    .then(r => r.json()).then(d => {
-        if (d.error) { alert('Error: ' + d.error); return; }
-        _setSidebarBtnActive('sbtn-send-emails');
-        _openOutreachTab('Send Emails to New Leads');
-    }).catch(e => alert('Error: ' + e.message));
+    _openOutreachSetup({
+        endpoint: '/api/send-emails', sidebarBtn: 'sbtn-send-emails',
+        title: 'Send Cold Emails', countKey: 'cold', pendingTxt: 'cold emails pending (New leads)',
+    });
 }
 
 function runSendFollowup() {
-    if (!confirm('Send follow-ups to all "Contacted" leads?\n\nEach follow-up will reference the original email Claude wrote. Progress shown live.')) return;
-    fetch('/api/send-followup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
-    .then(r => r.json()).then(d => {
-        if (d.error) { alert('Error: ' + d.error); return; }
-        _setSidebarBtnActive('sbtn-send-followup');
-        _openOutreachTab('Send Follow-ups');
-    }).catch(e => alert('Error: ' + e.message));
+    _openOutreachSetup({
+        endpoint: '/api/send-followup', sidebarBtn: 'sbtn-send-followup',
+        title: 'Send Follow-ups', countKey: 'followup', pendingTxt: 'follow-ups pending (Contacted leads)',
+    });
 }
 
+// Check Replies has no count — start directly into the live view
 function runCheckReplies() {
+    if (!confirm('Scan all 3 inboxes for new replies?')) return;
+    _showOutreachTab();
+    _setSidebarBtnActive('sbtn-check-replies');
+    document.getElementById('action-title').textContent = 'Check Replies';
     fetch('/api/check-replies', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
     .then(r => r.json()).then(d => {
         if (d.error) { alert('Error: ' + d.error); return; }
-        _setSidebarBtnActive('sbtn-check-replies');
-        _openOutreachTab('Check Replies — Scanning Inboxes');
+        _switchToLive('Scanning inboxes…');
     }).catch(e => alert('Error: ' + e.message));
 }
 
@@ -1020,6 +1135,10 @@ function stopEmailAction() {
 
 // ── Outreach tab live polling ─────────────────────────────────────────
 function updateOutreachStatus() {
+    // Don't touch the UI while the user is on the SETUP screen (not yet started)
+    const setupEl = document.getElementById('outreach-setup');
+    if (setupEl && !setupEl.classList.contains('hidden')) return;
+
     fetch('/api/email-action-status')
     .then(r => r.json())
     .then(d => {

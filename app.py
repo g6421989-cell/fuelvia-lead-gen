@@ -998,8 +998,9 @@ Email accounts: {len(OUTREACH_ACCOUNTS)}</p>
 # Each runs in a daemon thread; _alog() writes to live log.
 # ══════════════════════════════════════════════════════════════
 
-def _run_send_emails():
-    """Background: cold email every 'New' lead with fresh YouTube data + Claude."""
+def _run_send_emails(limit=None):
+    """Background: cold email 'New' leads with fresh YouTube data + Claude.
+    limit = max number of leads to email this run (None = all)."""
     import traceback as _tb
     _email_action_stop.clear()
     with _email_action_lock:
@@ -1064,6 +1065,12 @@ def _run_send_emails():
         with _email_action_lock:
             _email_action_state["status"] = "completed"
         return
+
+    # ── Apply user-selected limit (e.g. send only 10 of 50) ────
+    _available = len(new_leads)
+    if limit and limit > 0 and limit < _available:
+        new_leads = new_leads[:limit]
+        _alog(f"[{_ts()}]    Limit: sending {limit} of {_available} pending cold emails")
 
     # ── Step 4: send emails ────────────────────────────────────
     total = len(new_leads)
@@ -1202,8 +1209,9 @@ def _run_send_emails():
         _email_action_state.update({"status": "completed", "progress": 100})
 
 
-def _run_send_followup():
-    """Background: follow-up every 'Contacted' lead using saved Day 1 body."""
+def _run_send_followup(limit=None):
+    """Background: follow-up 'Contacted' leads using saved Day 1 body.
+    limit = max number of follow-ups to send this run (None = all)."""
     _email_action_stop.clear()
     with _email_action_lock:
         _email_action_state.update({
@@ -1228,6 +1236,12 @@ def _run_send_followup():
             with _email_action_lock:
                 _email_action_state["status"] = "completed"
             return
+
+        # ── Apply user-selected limit (e.g. send only 10 of 50) ────
+        _available = len(records)
+        if limit and limit > 0 and limit < _available:
+            records = records[:limit]
+            _alog(f"[{_ts()}]    Limit: sending {limit} of {_available} pending follow-ups")
 
         total = len(records)
         with _email_action_lock:
@@ -1518,19 +1532,56 @@ def _start_action(target_fn, name: str):
     return jsonify({"success": True})
 
 
+def _get_limit_from_request():
+    """Read an optional 'limit' (how many to send) from the POST body."""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        lim = data.get("limit")
+        if lim in (None, "", "all"):
+            return None
+        lim = int(lim)
+        return lim if lim > 0 else None
+    except Exception:
+        return None
+
+
 @app.route("/api/send-emails", methods=["POST"])
 def api_send_emails():
-    return _start_action(_run_send_emails, "send-emails")
+    limit = _get_limit_from_request()
+    return _start_action(lambda: _run_send_emails(limit=limit), "send-emails")
 
 
 @app.route("/api/send-followup", methods=["POST"])
 def api_send_followup():
-    return _start_action(_run_send_followup, "send-followup")
+    limit = _get_limit_from_request()
+    return _start_action(lambda: _run_send_followup(limit=limit), "send-followup")
 
 
 @app.route("/api/check-replies", methods=["POST"])
 def api_check_replies():
     return _start_action(_run_check_replies, "check-replies")
+
+
+@app.route("/api/campaign-counts")
+def api_campaign_counts():
+    """Pending counts for the campaign setup screen:
+    cold_pending = New leads, followup_pending = Contacted leads."""
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+        counts  = {}
+        for r in records:
+            s = (((r.get("properties") or {}).get("Status") or {}).get("select") or {}).get("name") or "New"
+            counts[s] = counts.get(s, 0) + 1
+        return jsonify({
+            "success": True,
+            "cold_pending":     counts.get("New", 0),
+            "followup_pending": counts.get("Contacted", 0),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/email-action-status")
