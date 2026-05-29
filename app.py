@@ -53,8 +53,7 @@ from flask import Flask, render_template, request, jsonify, session, Response
 
 from config import (
     NICHE_OPTIONS, LOCATION_OPTIONS, SUBSCRIBER_RANGES,
-    EMAIL_ROTATION_DELAY, SENDER_NAME, COMPANY_NAME,
-    YOUTUBE_APIS,
+    SENDER_NAME, COMPANY_NAME,
 )
 from notion_manager import NotionManager
 from claude_helpers import write_personalized_initial_email, write_personalized_followup_1
@@ -274,7 +273,7 @@ def _fetch_youtube_for_lead(youtube_url: str) -> tuple:
         return {}, []
     channel_id = m.group(1)
 
-    for key in YOUTUBE_APIS:
+    for key in settings_store.get_list("YOUTUBE_API_KEYS"):
         try:
             yt   = _yt_build("youtube", "v3", developerKey=key)
             resp = yt.channels().list(
@@ -786,10 +785,10 @@ def _run_scraper(
         if use_fresh_keywords:
             _log(f"[{_ts()}] 🔄 Smart keyword rotation: ON")
 
-        from config import YOUTUBE_APIS as _yt_keys
+        _yt_keys = settings_store.get_list("YOUTUBE_API_KEYS")
         _log(f"[{_ts()}]    YouTube API keys loaded: {len(_yt_keys)}")
         if not _yt_keys:
-            _log(f"[{_ts()}] ❌ NO YOUTUBE API KEYS — add YOUTUBE_API_1 to environment variables")
+            _log(f"[{_ts()}] ❌ NO YOUTUBE API KEYS — add them in Settings")
             with _state_lock: _scrape_state["status"] = "error"
             return
 
@@ -1327,8 +1326,8 @@ def _run_send_followup(limit=None):
                     _alog(f"[{_ts()}] ⏳ WAITING 2 MINUTES before next follow-up...")
                     _alog(f"[{_ts()}]    {remaining} follow-ups remaining")
 
-                    # Wait 2 minutes (120 seconds) with ability to stop
-                    wait_secs = EMAIL_ROTATION_DELAY
+                    # Wait the configured delay (live from Settings) with ability to stop
+                    wait_secs = settings_store.get("EMAIL_ROTATION_DELAY")
                     wait_ticks = wait_secs * 2  # Each tick is 0.5 seconds
                     for tick in range(wait_ticks):
                         if _email_action_stop.is_set():
@@ -1891,7 +1890,11 @@ def handle_403(e):
 def _startup_checks():
     """Run at boot — log config health and warm up critical systems."""
     import os as _os
-    from config import YOUTUBE_APIS as _YT_KEYS, NOTION_API_KEY, NOTION_DATABASE_ID, ANTHROPIC_API_KEY
+    # Read LIVE from settings store (UI overrides + env) so boot log matches reality
+    _YT_KEYS    = settings_store.get_list("YOUTUBE_API_KEYS")
+    _NOTION_KEY = settings_store.get("NOTION_API_KEY")
+    _NOTION_DB  = settings_store.get("NOTION_DATABASE_ID")
+    _CLAUDE_KEY = settings_store.get("CLAUDE_API_KEY")
     print("=" * 56)
     print("  FUELVIA Lead Generation System — Starting Up")
     print("=" * 56)
@@ -1900,16 +1903,16 @@ def _startup_checks():
     if _YT_KEYS:
         print(f"  [OK] YouTube API: {len(_YT_KEYS)} key(s) loaded")
     else:
-        print("  [!!] YouTube API: NO KEYS — add YOUTUBE_API_1 in env vars")
+        print("  [!!] YouTube API: NO KEYS — add them in Settings")
 
     # Notion
-    if NOTION_API_KEY and NOTION_DATABASE_ID:
+    if _NOTION_KEY and _NOTION_DB:
         print("  [OK] Notion: configured")
     else:
         print("  [!!] Notion: MISSING KEY or DATABASE_ID")
 
     # Claude
-    if ANTHROPIC_API_KEY:
+    if _CLAUDE_KEY:
         print("  [OK] Claude API: configured")
     else:
         print("  [WR] Claude API: not set — fallback email templates will be used")
