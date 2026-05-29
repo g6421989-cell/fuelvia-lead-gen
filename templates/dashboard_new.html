@@ -261,8 +261,8 @@
 </head>
 <body>
 
-<!-- ── LOGIN ───────────────────────────────────────────────────────── -->
-<div id="login-screen">
+<!-- ── LOGIN (password removed — hidden, kept for layout compatibility) ── -->
+<div id="login-screen" class="hidden">
     <div class="login-box">
         <div class="login-logo">Fuelvia</div>
         <div class="login-tagline">Lead Generation</div>
@@ -279,7 +279,7 @@
 </div>
 
 <!-- ── DASHBOARD ───────────────────────────────────────────────────── -->
-<div id="dashboard" class="hidden">
+<div id="dashboard">
 
     <!-- SIDEBAR -->
     <div class="sidebar">
@@ -1216,13 +1216,9 @@ function startPolling() {
     }, 2000);
 }
 
-// ── Logout ────────────────────────────────────────────────────────────
+// ── Logout (password removed — just refreshes the dashboard) ──────────
 function handleLogout() {
-    fetch('/api/logout', { method:'POST' }).then(() => {
-        document.getElementById('dashboard').classList.add('hidden');
-        document.getElementById('login-screen').classList.remove('hidden');
-        document.getElementById('login-password').value = '';
-    });
+    location.reload();
 }
 
 // ── Modals ────────────────────────────────────────────────────────────
@@ -1262,6 +1258,10 @@ function showReplyBody(r) {
     document.getElementById('modal-message').textContent = r.message || r.reply_message || 'No message body stored.';
     openModal();
 }
+
+// ── No-auth init: password removed, open the dashboard immediately ────
+loadDashboard();
+startPolling();
 </script>
 </body>
 </html>

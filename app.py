@@ -506,38 +506,22 @@ def llms():
 
 @app.route("/")
 def index():
-    """Public login page — zero dashboard content."""
-    if session.get("auth"):
-        from flask import redirect
-        return redirect("/dashboard")
-    return render_template("login.html")
+    """Dashboard — password removed, open access (bot-detection decoy still applies)."""
+    return render_template("dashboard_new.html")
 
 @app.route("/dashboard")
 def dashboard():
-    """
-    Auth-gated dashboard. Server checks session BEFORE sending any HTML.
-    No valid session → back to login. A bot can never fetch this content.
-    """
-    if not session.get("auth"):
-        from flask import redirect
-        return redirect("/")
+    """Dashboard — password removed, served directly."""
     return render_template("dashboard_new.html")
 
 
-# ── Login / Logout ─────────────────────────────────────────────
+# ── Login / Logout (password removed — kept as no-ops for compatibility) ──
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
-    from security import track_failed_login, _get_decoy_page
-    ip = request.remote_addr
-    data = request.get_json(force=True)
-    if data.get("password") == DASHBOARD_PASSWORD:
-        session["auth"] = True
-        return jsonify({"success": True, "redirect": "/dashboard"})
-    else:
-        if not track_failed_login(ip):
-            return _get_decoy_page(), 200
-    return jsonify({"success": False, "error": "Wrong password"}), 401
+    # Password removed: always succeed so any legacy client call still works.
+    session["auth"] = True
+    return jsonify({"success": True, "redirect": "/dashboard"})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -548,10 +532,8 @@ def api_logout():
 
 @app.route("/api/me")
 def api_me():
-    """Auth check used by JS on page load. 200 = logged in, 401 = not."""
-    if session.get("auth"):
-        return jsonify({"authenticated": True})
-    return jsonify({"authenticated": False}), 401
+    """Password removed — always authenticated."""
+    return jsonify({"authenticated": True})
 
 
 # ── Overview stats ─────────────────────────────────────────────
