@@ -1783,24 +1783,24 @@ def _startup_checks():
 
     # YouTube API keys
     if _YT_KEYS:
-        print(f"  ✅ YouTube API: {len(_YT_KEYS)} key(s) loaded")
+        print(f"  [OK] YouTube API: {len(_YT_KEYS)} key(s) loaded")
     else:
-        print("  ❌ YouTube API: NO KEYS — add YOUTUBE_API_1 in env vars")
+        print("  [!!] YouTube API: NO KEYS — add YOUTUBE_API_1 in env vars")
 
     # Notion
     if NOTION_API_KEY and NOTION_DATABASE_ID:
-        print("  ✅ Notion: configured")
+        print("  [OK] Notion: configured")
     else:
-        print("  ❌ Notion: MISSING KEY or DATABASE_ID")
+        print("  [!!] Notion: MISSING KEY or DATABASE_ID")
 
     # Claude
     if ANTHROPIC_API_KEY:
-        print("  ✅ Claude API: configured")
+        print("  [OK] Claude API: configured")
     else:
-        print("  ⚠  Claude API: not set — fallback email templates will be used")
+        print("  [WR] Claude API: not set — fallback email templates will be used")
 
     # Email accounts
-    print(f"  ✅ Email accounts: {len(OUTREACH_ACCOUNTS)} loaded")
+    print(f"  [OK] Email accounts: {len(OUTREACH_ACCOUNTS)} loaded")
     for acc in OUTREACH_ACCOUNTS:
         print(f"       • {acc['email']}")
 
@@ -1808,18 +1808,39 @@ def _startup_checks():
     try:
         from channel_blacklist import blacklist_size
         bl = blacklist_size()
-        print(f"  ✅ Blacklist DB: {bl} channels")
+        print(f"  [OK] Blacklist DB: {bl} channels")
     except Exception as e:
-        print(f"  ⚠  Blacklist DB: {e}")
+        print(f"  [WR] Blacklist DB: {e}")
 
     try:
         from daily_send_limit import reset_expired, get_today_count
         reset_expired()
-        print("  ✅ Daily send limits: OK")
+        print("  [OK] Daily send limits: OK")
     except Exception as e:
-        print(f"  ⚠  Daily send limits: {e}")
+        print(f"  [WR] Daily send limits: {e}")
 
     print("=" * 56)
+
+
+# Alias for audit compatibility
+def get_dashboard_data():
+    """Get dashboard stats (audit-compatible function)"""
+    notion  = NotionManager()
+    records = notion.get_all_leads()
+    counts  = {}
+    for r in records:
+        s = (((r.get("properties") or {}).get("Status") or {}).get("select") or {}).get("name") or "New"
+        counts[s] = counts.get(s, 0) + 1
+    return {
+        "leads_total":      len(records),
+        "emails_sent":      (counts.get("Contacted", 0) + counts.get("Follow-up 1", 0) +
+                            counts.get("Follow-up Sent", 0) + counts.get("Follow-up 1 Sent", 0) +
+                            counts.get("Replied", 0) + counts.get("Closed", 0)),
+        "replies_received": counts.get("Replied", 0),
+        "new_leads":        counts.get("New", 0),
+        "contacted":        counts.get("Contacted", 0),
+        "closed":           counts.get("Closed", 0),
+    }
 
 
 if __name__ == "__main__":

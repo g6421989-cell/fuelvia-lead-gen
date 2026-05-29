@@ -71,15 +71,25 @@ def send_outreach_email(to_email, subject, body, account=None, is_followup=False
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
-    try:
-        with smtplib.SMTP(account["smtp_server"], account["smtp_port"]) as server:
-            server.starttls()
-            server.login(account["email"], account["password"])
-            server.sendmail(account["email"], to_email, msg.as_string())
-        return True, account["email"]
-    except Exception as e:
-        print(f"  ❌ SMTP error: {e}")
-        return False, None
+    # Try multiple ports for Render/cloud environment compatibility
+    ports_to_try = [account["smtp_port"], 465, 587, 25]
+
+    for attempt, port in enumerate(ports_to_try, 1):
+        try:
+            with smtplib.SMTP(account["smtp_server"], port, timeout=30) as server:
+                if port != 25:  # Port 25 doesn't use TLS
+                    server.starttls()
+                server.login(account["email"], account["password"])
+                server.sendmail(account["email"], to_email, msg.as_string())
+            return True, account["email"]
+        except Exception as e:
+            error_msg = str(e)[:150]
+            if attempt == len(ports_to_try):  # Last attempt
+                print(f"  [!!] SMTP failed (all ports): {error_msg}")
+                return False, error_msg
+            continue
+
+    return False, "All SMTP ports failed"
 
 
 def send_report_email(to_email, subject, body):
@@ -92,15 +102,25 @@ def send_report_email(to_email, subject, body):
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
-    try:
-        with smtplib.SMTP(account["smtp_server"], account["smtp_port"]) as server:
-            server.starttls()
-            server.login(account["email"], account["password"])
-            server.sendmail(account["email"], to_email, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"  ❌ Report email error: {e}")
-        return False
+    # Try multiple ports for Render/cloud environment compatibility
+    ports_to_try = [account["smtp_port"], 465, 587, 25]
+
+    for attempt, port in enumerate(ports_to_try, 1):
+        try:
+            with smtplib.SMTP(account["smtp_server"], port, timeout=30) as server:
+                if port != 25:  # Port 25 doesn't use TLS
+                    server.starttls()
+                server.login(account["email"], account["password"])
+                server.sendmail(account["email"], to_email, msg.as_string())
+            return True
+        except Exception as e:
+            error_msg = str(e)[:150]
+            if attempt == len(ports_to_try):  # Last attempt
+                print(f"  [!!] Report email error (all ports): {error_msg}")
+                return False
+            continue
+
+    return False
 
 
 class ReplyChecker:
