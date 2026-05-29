@@ -1,31 +1,43 @@
-import sys
+"""
+Vercel entry point — serves the Fuelvia dashboard HTML directly.
+The full Flask app (app.py) cannot run on Vercel serverless because it uses
+background threads, SQLite, and long-running SMTP sessions.
+This handler just delivers the UI shell; the actual API calls it makes
+(/api/dashboard-data etc.) will 404 on Vercel — that is expected.
+For full functionality use Render (persistent server).
+"""
 import os
+from http.server import BaseHTTPRequestHandler
 
-# Add project root to path
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+TEMPLATE = os.path.join(ROOT, "templates", "dashboard_new.html")
 
-try:
-    from app import app as handler
-except Exception as e:
-    # Fallback: serve the dashboard HTML directly if app fails to import
-    from flask import Flask, render_template, send_from_directory
-    handler = Flask(__name__, template_folder=os.path.join(ROOT, "templates"),
-                    static_folder=os.path.join(ROOT, "static"))
 
-    @handler.route("/", defaults={"path": ""})
-    @handler.route("/<path:path>")
-    def catch_all(path):
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
         try:
-            return render_template("dashboard_new.html")
-        except Exception:
-            return f"""<!DOCTYPE html>
-<html><head><title>Fuelvia</title>
-<style>body{{font-family:sans-serif;background:#0a0a0a;color:#d4d4d4;
-display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}}
-.box{{text-align:center;padding:40px;}}.title{{font-size:28px;color:#fff;margin-bottom:10px;}}
-.sub{{color:#888;font-size:14px;}}</style></head>
-<body><div class="box">
-<div class="title">Fuelvia — Lead Generation</div>
-<div class="sub">System loading... Import error: {str(e)[:120]}</div>
-</div></body></html>"""
+            with open(TEMPLATE, "r", encoding="utf-8") as f:
+                html = f.read()
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as e:
+            msg = f"Error loading dashboard: {e}".encode()
+            self.send_response(500)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(msg)))
+            self.end_headers()
+            self.wfile.write(msg)
+
+    def do_POST(self):
+        # API calls from the dashboard won't work on Vercel (needs persistent server)
+        # Return a friendly JSON error so the UI doesn't show a raw error
+        body = b'{"error":"API not available on Vercel. Run locally or on Render."}'
+        self.send_response(503)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
