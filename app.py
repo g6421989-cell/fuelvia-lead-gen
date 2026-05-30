@@ -651,15 +651,15 @@ def api_send_mode():
     """Current send mode + readiness — used by the dashboard header badge."""
     if not _auth():
         return jsonify({"error": "Unauthorized"}), 401
+    from instantly_helpers import instantly_ready
     mode = settings_store.get("SEND_MODE") or "smtp"
-    ready = True
-    if mode == "instantly":
-        from instantly_helpers import instantly_ready
-        ready = instantly_ready()
+    inst_ready = instantly_ready()
+    ready = inst_ready if mode == "instantly" else True
     return jsonify({
         "mode": mode,
         "label": "Instantly.ai" if mode == "instantly" else "Direct SMTP",
         "ready": ready,
+        "instantly_ready": inst_ready,   # is Instantly configured, regardless of current mode
     })
 
 

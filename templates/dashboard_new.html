@@ -184,6 +184,7 @@
         .setup-field input:focus { outline: none; border-color: var(--black); }
         .setup-hint { font-size: 11px; color: var(--mid); margin-top: 6px; }
         .setup-actions { display: flex; gap: 10px; }
+        .setup-method { margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--light); }
 
         /* ── SEND-MODE BADGE (header) ────────────────────────────────── */
         .mode-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
@@ -467,6 +468,19 @@
                         <span class="setup-pending-num" id="setup-pending-num">—</span>
                         <span class="setup-pending-txt" id="setup-pending-txt">pending</span>
                     </div>
+
+                    <!-- SEND METHOD chooser (cold emails) — pick before starting -->
+                    <div class="setup-method hidden" id="setup-method">
+                        <label style="display:block;font-size:12px;font-weight:700;color:var(--charcoal);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                            Send via — choose a method
+                        </label>
+                        <div class="mode-toggle" id="setup-method-toggle">
+                            <button type="button" class="mode-btn" data-mode="smtp" onclick="_pickSendMethod('smtp', this)">Direct SMTP</button>
+                            <button type="button" class="mode-btn" data-mode="instantly" onclick="_pickSendMethod('instantly', this)">Instantly.ai</button>
+                        </div>
+                        <div class="setup-hint" id="setup-method-hint"></div>
+                    </div>
+
                     <div class="setup-controls">
                         <div class="setup-field">
                             <label for="setup-count">How many to send now?</label>
@@ -1077,6 +1091,36 @@ function _setSidebarBtnActive(id) {
 // Tracks which campaign the setup screen is configuring
 let _pendingAction = null;   // { endpoint, sidebarBtn, liveLabel }
 let _setupMax = 0;
+let _chosenSendMethod = 'smtp';   // method picked on the setup screen
+let _instantlyReady = false;      // is Instantly configured (key + campaign)
+
+function _updateMethodHint() {
+    const hint = document.getElementById('setup-method-hint');
+    if (!hint) return;
+    if (_chosenSendMethod === 'instantly') {
+        hint.textContent = _instantlyReady
+            ? 'Leads get pushed into your Instantly campaign (status → Queued). No SMTP used.'
+            : '⚠ Instantly is NOT configured — add the API key + Campaign ID in Settings, or pick Direct SMTP.';
+        hint.style.color = _instantlyReady ? 'var(--mid)' : '#7b2d2d';
+    } else {
+        hint.textContent = 'Emails are sent directly from your SMTP accounts.';
+        hint.style.color = 'var(--mid)';
+    }
+}
+
+function _setSendMethodUI(mode) {
+    _chosenSendMethod = mode;
+    document.querySelectorAll('#setup-method-toggle .mode-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === mode));
+    _updateMethodHint();
+}
+
+function _pickSendMethod(mode, btn) {
+    _chosenSendMethod = mode;
+    btn.parentElement.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _updateMethodHint();
+}
 
 function _showOutreachTab() {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
@@ -1097,10 +1141,24 @@ function _openOutreachSetup(opts) {
     document.getElementById('btn-stop-action').classList.add('hidden');
 
     document.getElementById('action-title').textContent = opts.title;
-    document.getElementById('action-subtitle').textContent = 'Choose how many to send, then press Start';
+    document.getElementById('action-subtitle').textContent = 'Pick a method + how many, then press Start';
     document.getElementById('setup-title').textContent = opts.title + ' — Setup';
     document.getElementById('setup-pending-num').textContent = '…';
     document.getElementById('setup-pending-txt').textContent = opts.pendingTxt;
+
+    // Send-method chooser: cold emails let you pick SMTP vs Instantly.
+    // Follow-ups always go via SMTP (Instantly runs its own sequences).
+    const methodWrap = document.getElementById('setup-method');
+    if (opts.countKey === 'cold') {
+        methodWrap.classList.remove('hidden');
+        fetch('/api/send-mode').then(r => r.json()).then(sm => {
+            _instantlyReady = sm.instantly_ready === true;
+            _setSendMethodUI(sm.mode || 'smtp');   // start on the saved mode
+        }).catch(() => { _instantlyReady = false; _setSendMethodUI('smtp'); });
+    } else {
+        methodWrap.classList.add('hidden');
+        _chosenSendMethod = 'smtp';
+    }
 
     const startBtn = document.getElementById('btn-start-send');
     startBtn.disabled = true; startBtn.textContent = 'Loading…';
@@ -1145,19 +1203,41 @@ function startEmailAction() {
     const limit = parseInt(document.getElementById('setup-count').value, 10) || _setupMax;
 
     const startBtn = document.getElementById('btn-start-send');
+    const reset = () => { startBtn.disabled = false; startBtn.textContent = '▷ Start Sending'; };
     startBtn.disabled = true; startBtn.textContent = 'Starting…';
 
-    fetch(_pendingAction.endpoint, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ limit: limit })
-    }).then(r => r.json()).then(d => {
-        startBtn.disabled = false; startBtn.textContent = '▷ Start Sending';
-        if (d.error) { alert('Error: ' + d.error); return; }
-        _switchToLive(`${_pendingAction.title} — sending ${limit}`);
-    }).catch(e => {
-        startBtn.disabled = false; startBtn.textContent = '▷ Start Sending';
-        alert('Error: ' + e.message);
-    });
+    const isCold  = _pendingAction.countKey === 'cold';
+    const method  = isCold ? _chosenSendMethod : 'smtp';
+    const viaTxt  = method === 'instantly' ? 'Instantly.ai' : 'Direct SMTP';
+
+    // Block sending via Instantly if it isn't configured yet
+    if (isCold && method === 'instantly' && !_instantlyReady) {
+        alert('Instantly is selected but NOT configured.\n\nAdd the Instantly API Key + Campaign ID in Settings, or switch to Direct SMTP.');
+        reset(); return;
+    }
+
+    const fire = () => {
+        fetch(_pendingAction.endpoint, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ limit: limit })
+        }).then(r => r.json()).then(d => {
+            reset();
+            if (d.error) { alert('Error: ' + d.error); return; }
+            _switchToLive(`${_pendingAction.title} via ${viaTxt} — ${limit} lead(s)`);
+        }).catch(e => { reset(); alert('Error: ' + e.message); });
+    };
+
+    // For cold emails, persist the chosen method first so the backend + header
+    // agree, THEN start. (Follow-ups skip this — always SMTP.)
+    if (isCold) {
+        fetch('/api/settings', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ SEND_MODE: method })
+        }).then(() => { refreshSendModeBadge(); fire(); })
+          .catch(() => fire());
+    } else {
+        fire();
+    }
 }
 
 // ── Switch from setup view to the live progress view ─────────────────
