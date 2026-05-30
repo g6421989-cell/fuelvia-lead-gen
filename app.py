@@ -1701,6 +1701,35 @@ def _run_instantly_sync():
         _email_action_state.update({"status": "completed", "progress": 100})
 
 
+def _cut_reason(result: dict) -> str:
+    """Plain-English 'why this lead was cut' from the score breakdown / hard rules.
+    (Email is never a factor — the scraper guarantees every lead already has one.)"""
+    base = (result.get("reason") or "").lower()
+    if "entertain" in base:
+        return "entertainment / hobby channel — not a business that would buy content help"
+    if "inactive" in base or "abandoned" in base:
+        return "channel looks abandoned (no recent uploads)"
+    b = result.get("breakdown") or {}
+    weak = []
+    if (b.get("ctas") or 0) < 0.4:          weak.append("no business CTAs (no booking / coaching / offer in their videos)")
+    if (b.get("b2b_language") or 0) < 0.3:  weak.append("little business or coaching language")
+    if (b.get("activity") or 0) < 1.0:      weak.append("not posting recently")
+    if (b.get("frequency") or 0) < 0.5:     weak.append("posts inconsistently")
+    if (b.get("engagement") or 0) < 0.4:    weak.append("low audience engagement")
+    return ("not a fit — " + "; ".join(weak)) if weak else "overall fit score below threshold"
+
+
+def _keep_reason(result: dict) -> str:
+    """Short 'why this lead was kept' — its strongest signals."""
+    b = result.get("breakdown") or {}
+    bits = []
+    if (b.get("ctas") or 0) >= 1.0:          bits.append("clear business CTAs")
+    if (b.get("b2b_language") or 0) >= 0.5:  bits.append("strong business focus")
+    if (b.get("activity") or 0) >= 1.5:      bits.append("very active")
+    elif (b.get("activity") or 0) >= 1.0:    bits.append("active")
+    return ", ".join(bits) if bits else "solid overall fit"
+
+
 def _run_qualify_preview():
     """
     Re-qualify every 'New' lead with the system's own intelligence
@@ -1747,7 +1776,10 @@ def _run_qualify_preview():
             _alog(f"[{_ts()}] [{i}/{total}] ⚠ {cname} — couldn't fetch YouTube, KEPT (unverified)")
             continue
 
-        cdata["email"] = lead.get("email") or ""
+        # Email is GUARANTEED by the scraper — never disqualify on it. We pass a
+        # placeholder so the scorer's email check always passes and the verdict is
+        # based purely on the real fit signals (CTAs, B2B language, activity, size).
+        cdata["email"] = lead.get("email") or "verified@lead"
         if videos:
             cdata["last_video_date"] = videos[0].get("published_at", "")
         if not cdata.get("subscriber_count"):
@@ -1756,15 +1788,15 @@ def _run_qualify_preview():
         result    = intelligent_score_channel(cdata, videos, days_since_last_video(videos))
         score     = result.get("score", 0)
         qualified = result.get("qualified", False)
-        reason    = (result.get("reason") or "").replace("✅", "").replace("❌", "").strip()
 
         if qualified:
             keep += 1
-            _alog(f"[{_ts()}] [{i}/{total}] ✅ KEEP  {cname}  (score {score}/10)")
+            _alog(f"[{_ts()}] [{i}/{total}] ✅ KEEP  {cname}  (score {score}/10) — {_keep_reason(result)}")
         else:
+            why = _cut_reason(result)
             cut_ids.append(lead["id"])
-            cut_preview.append({"name": cname, "score": score, "reason": reason})
-            _alog(f"[{_ts()}] [{i}/{total}] ✂ CUT   {cname}  (score {score}/10) — {reason}")
+            cut_preview.append({"name": cname, "score": score, "reason": why})
+            _alog(f"[{_ts()}] [{i}/{total}] ✂ CUT   {cname}  (score {score}/10) — {why}")
 
     with _qualify_lock:
         _qualify_state.update({"cut_ids": cut_ids, "cut_preview": cut_preview,
