@@ -24,10 +24,50 @@ def instantly_ready() -> bool:
            bool(settings_store.get("INSTANTLY_CAMPAIGN_ID"))
 
 
+_GENERIC_LOCALPARTS = {
+    "info", "hello", "hi", "hey", "contact", "team", "admin", "mail", "email",
+    "support", "business", "official", "media", "studio", "yt", "youtube",
+    "sales", "help", "noreply", "no", "reply", "the", "hq", "agency", "co",
+    "social", "marketing", "booking", "bookings", "inquiries", "enquiries",
+}
+_NON_NAME_WORDS = {
+    "the", "tech", "official", "real", "daily", "my", "team", "studio", "media",
+    "channel", "tv", "news", "review", "reviews", "mr", "mrs", "ms", "dr", "prof",
+    "digital", "creative", "online", "best", "top", "pro", "global",
+}
+
+
+def _first_name(name: str, email: str = "") -> str:
+    """
+    Best-effort HUMAN first name for Instantly's {{firstName}}.
+      1) channel/display name — only if it looks like a person (≤2 words, not a brand word)
+      2) email local-part.
+    Returns '' if no confident human name (so the sequence can fall back cleanly).
+    """
+    base = name or ""
+    for sep in ["-", "|", "–", "—", ":", "(", "/", ",", "@"]:
+        if sep in base:
+            base = base.split(sep)[0]
+    toks = base.strip().split()
+    if (toks and len(toks) <= 2 and toks[0].isalpha()
+            and 2 <= len(toks[0]) <= 15 and toks[0].lower() not in _NON_NAME_WORDS):
+        return toks[0].capitalize()
+
+    if email and "@" in email:
+        local = email.split("@")[0]
+        for ch in "._-0123456789+":
+            local = local.replace(ch, " ")
+        for part in local.split():
+            if part.isalpha() and 2 <= len(part) <= 15 and part.lower() not in _GENERIC_LOCALPARTS:
+                return part.capitalize()
+    return ""
+
+
 def add_lead_to_instantly(email: str,
                           channel_name: str,
                           youtube_url: str,
                           email_body: str,
+                          subject: str = "",
                           subscriber_count=0,
                           niche: str = "") -> tuple:
     """
@@ -36,12 +76,14 @@ def add_lead_to_instantly(email: str,
     Returns (success: bool, error_msg: str).
 
     Maps Fuelvia lead data → Instantly lead fields:
-      email            -> email
-      channel_name     -> first_name, company_name
-      youtube_url      -> website
-      Claude email body-> personalization
-      campaign id      -> campaign
-      + custom_variables: channel_name, subscriber_count, niche, youtube_url
+      email             -> email
+      first name        -> first_name   ({{firstName}})
+      channel_name      -> company_name
+      youtube_url       -> website
+      Claude email body -> personalization  ({{personalization}})
+      campaign id       -> campaign
+      + custom_variables you can use as {{...}} in the sequence:
+        email_subject, email_body, channel_name, subscriber_count, niche, youtube_url
     """
     api_key     = settings_store.get("INSTANTLY_API_KEY")
     campaign_id = settings_store.get("INSTANTLY_CAMPAIGN_ID")
@@ -55,12 +97,14 @@ def add_lead_to_instantly(email: str,
 
     payload = {
         "email":           email,
-        "first_name":      channel_name,
+        "first_name":      _first_name(channel_name, email),
         "company_name":    channel_name,
         "website":         youtube_url,
         "personalization": email_body,
         "campaign":        campaign_id,
         "custom_variables": {
+            "email_subject":    subject,      # use as {{email_subject}} in the sequence subject line
+            "email_body":       email_body,   # use as {{email_body}} (same as {{personalization}})
             "channel_name":     channel_name,
             "subscriber_count": subscriber_count,
             "niche":            niche,

@@ -142,118 +142,157 @@ _FORBIDDEN = (
 
 # ── DAY 1 COLD EMAIL ───────────────────────────────────────────
 
+# Email mailboxes that are NOT a person's name
+_GENERIC_LOCALPARTS = {
+    "info", "hello", "hi", "hey", "contact", "team", "admin", "mail", "email",
+    "support", "business", "official", "media", "studio", "yt", "youtube",
+    "sales", "help", "noreply", "no", "reply", "the", "hq", "agency", "co",
+    "social", "marketing", "booking", "bookings", "inquiries", "enquiries",
+}
+# First words that signal a brand/channel, not a person
+_NON_NAME_WORDS = {
+    "the", "tech", "official", "real", "daily", "my", "team", "studio", "media",
+    "channel", "tv", "news", "review", "reviews", "mr", "mrs", "ms", "dr", "prof",
+    "digital", "creative", "online", "best", "top", "pro", "global",
+}
+
+
+def _greeting_name(channel_name: str, email: str = "") -> str:
+    """
+    Best-effort HUMAN first name from all available data.
+      1) channel/display name — only if it looks like a person (≤2 words, not a brand word)
+      2) email local-part (kartik@.. -> Kartik, john.doe@.. -> John)
+    Returns '' when no confident human name exists → caller uses 'Hey there,'.
+    Never returns a brand word or a generic role mailbox (info@, team@, ...).
+    """
+    # 1) Channel / display name (text before a separator)
+    base = channel_name or ""
+    for sep in ["-", "|", "–", "—", ":", "(", "/", ",", "@"]:
+        if sep in base:
+            base = base.split(sep)[0]
+    toks = base.strip().split()
+    if (toks and len(toks) <= 2 and toks[0].isalpha()
+            and 2 <= len(toks[0]) <= 15 and toks[0].lower() not in _NON_NAME_WORDS):
+        return toks[0].capitalize()
+
+    # 2) Email local-part
+    if email and "@" in email:
+        local = email.split("@")[0]
+        for ch in "._-0123456789+":
+            local = local.replace(ch, " ")
+        for part in local.split():
+            if part.isalpha() and 2 <= len(part) <= 15 and part.lower() not in _GENERIC_LOCALPARTS:
+                return part.capitalize()
+
+    return ""
+
+
 def write_personalized_initial_email(
     channel_data: dict,
     videos_data: list,
 ) -> tuple[str, str]:
     """
-    Write a hyper-personalised Day 1 cold email. Six anti-template
-    rules applied at the prompt level to guarantee every email
-    is unique and creator-specific.
+    Write the Day-1 cold email in Fuelvia's house style (casual, pain-point-led,
+    NEVER a pitch). Both the SUBJECT and BODY are personalised every time using
+    the lead's channel/niche/recent content. Signed by the Founder of Fuelvia.
+
+    This prompt IS the persistent "house style" — every email Claude writes
+    references it, so the voice stays consistent without re-teaching it.
+    Returns (subject, body).
     """
-    channel_name  = channel_data.get("channel_name", "Creator")
+    channel_name  = channel_data.get("channel_name", "there")
     niche         = channel_data.get("niche", "content creation")
     subs          = channel_data.get("subscriber_count", 0)
-    days_inactive = channel_data.get("days_since_upload", 0)
+    lead_email    = channel_data.get("email", "")
     subs_fmt      = _fmt_subs(subs)
     video_block   = _build_video_block(videos_data)
-    subject       = random.choice(_DAY1_SUBJECTS)
-    offer_variant = random.choice(_OFFER_VARIANTS)
-    closing       = random.choice(_CLOSING_VARIANTS)
-    tone_rule     = _sub_tier(subs)
 
-    prompt = f"""You are writing a cold outreach email for {SENDER_NAME} at Fuelvia (fuelviaa.com).
-Fuelvia is a video editing and content production agency. They edit raw footage into scroll-stopping videos — reels, shorts, YouTube long-form, talking-head, cinematic — delivered in 24-72 hours.
+    prompt = f"""You are the in-house cold-email writer for Fuelvia (fuelviaa.com) — a content +
+video team that handles scripting, editing and posting so creators, coaches and experts can grow
+their personal brand and pull in leads WITHOUT doing the content grind themselves.
+You write every email as {SENDER_NAME}, Founder of Fuelvia.
 
-━━━━ CREATOR INFO ━━━━
-Channel     : {channel_name}
-Niche       : {niche}
-Subscribers : {subs_fmt}
-Days since last upload: {days_inactive}
-
-Recent video titles:
+━━━━ WHO YOU'RE EMAILING ━━━━
+Name / Channel : {channel_name}
+Email          : {lead_email or "(unknown)"}
+Niche          : {niche}
+Audience size  : {subs_fmt}
+Recent videos  :
 {video_block}
 
-━━━━ TONE RULE (follow exactly based on their size) ━━━━
-{tone_rule}
+━━━━ HOUSE STYLE — this is the exact voice, follow it every time ━━━━
+Write like a real founder firing off a quick, casual note to a peer. NOT a marketer. NOT a pitch.
+Study these two reference patterns and write a FRESH email in the same spirit (never copy verbatim):
 
-━━━━ EMAIL STRUCTURE — 5 paragraphs, plain text, UNDER 120 WORDS ━━━━
+PATTERN A — short, question-led:
+  Hey [first name],
+  Quick one — are you trying to pull more leads out of your {niche} content?
+  If yes, we might be able to help — we handle content + strategy for {niche} folks.
+  If no, no worries, just delete this. If maybe, let's talk.
 
-PARAGRAPH 1 — INSIGHT OPENER (not a compliment)
-Do NOT say the video was good, great, interesting, or impressive.
-Instead, make an observation that shows you understood the CONTENT.
-Read the video title and ask: what does this topic actually mean for someone making content about it?
-GOOD example for "How I Automated My Business in 30 Days":
-→ "Automating an entire business in 30 days means you either have bulletproof systems or you broke something along the way — either way that video earned its watch time."
-BAD example: "Great video on automation. I really enjoyed it."
-The opener must feel like it came from someone who actually engaged with that specific topic.
-Reference {channel_name} or the video title naturally.
+PATTERN B — pain-point-led:
+  Subject: the content problem most {niche} creators hit
+  Hey [first name],
+  Most {niche} creators are in the same boat — they know content matters but don't have time to
+  script, edit and post consistently. So they either don't post, or post stuff that doesn't convert.
+  We fix that by running the whole thing — scripting, editing, posting — so you focus on the
+  business and your brand actually brings in leads.
+  Only works if you're serious about it. If you are, let's talk.
 
-PARAGRAPH 2 — EXACT PAIN POINT (match their content type precisely)
-Look at their video titles and identify what TYPE of content they make:
-- Business systems/automation creators → pain: making complex workflows look simple and engaging on camera
-- Coaching/mindset creators → pain: keeping talking-head content visually dynamic and not losing viewers
-- Course/education creators → pain: making long recordings feel punchy and high-retention
-- Finance/investing creators → pain: making data-heavy content visually engaging without losing accuracy
-- Fitness/health creators → pain: production quality gap between their expertise and how it looks on screen
-- Agency/freelancer creators → pain: consistent posting schedule while running client work simultaneously
-Match the pain to what you actually see in their titles. NEVER use a generic pain point.
+━━━━ HARD RULES (every email) ━━━━
+1. THE FIRST EMAIL IS NEVER A PITCH. Open by naming a SPECIFIC pain or asking a sharp question
+   that's genuinely true for {channel_name}'s kind of content. No compliments ("love your channel"),
+   no "free edit" gimmick, no "I hope this finds you well", no selling in line one.
+2. CASUAL, not corporate. Short, human sentences. Like texting a peer you respect. Never stiff,
+   never salesy, never "professional-formal".
+3. SPECIFIC to them — use what their recent videos are actually about so this email could NOT be
+   copy-pasted to a random creator.
+4. SHORT — under ~90 words total.
+5. LOW-PRESSURE close with an out (e.g. "no worries if not" / "if maybe, let's talk" /
+   "only if you're serious"). Never pushy, never "book a call now".
+6. GREETING — work out a real first name from the data, in this order:
+   (a) the channel/display name "{channel_name}" (e.g. "Kartik Dhiman - Coach" → "Kartik"), then
+   (b) the email address "{lead_email or '(unknown)'}" (e.g. "kartik@gmail.com" → "Kartik",
+       "john.doe@site.com" → "John").
+   If you find a clear HUMAN first name, greet "Hey {{Name}},".
+   If it's a brand/company or only a generic mailbox (info@, team@, hello@, a channel like
+   "Tech Review Central") and you can't confidently pull a person's name, just write "Hey there,".
+   NEVER invent a name and NEVER use a brand word or company name as the greeting name.
+7. Plain text. No bullets, no bold, no links in the body.
+8. Sign off EXACTLY like this (two lines):
+   {SENDER_NAME}
+   Founder, Fuelvia
+9. PERSONALISE THE SUBJECT too — short, lowercase, pain- or curiosity-led, never salesy.
+   Good: "the content problem {niche} creators hit" / "quick one about your {niche} content"
+   Bad : "Grow your brand with Fuelvia!" / "Boost your leads today!"
 
-PARAGRAPH 3 — WHO WE ARE (one sentence only)
-"We're Fuelvia, a video editing agency that helps [their content type] creators turn raw footage into scroll-stopping content — delivered in 24 hours."
-Customise "[their content type]" to match their actual niche.
+NEVER use: {_FORBIDDEN}
 
-PARAGRAPH 4 — THE FREE OFFER
-Use this exact offer wording (already chosen for this email — do not change it):
-"{offer_variant}"
-Then add: If they love it they can talk about working together. If they don't, Fuelvia never contacts them again.
-Make it feel like a genuine no-risk gift.
-
-PARAGRAPH 5 — CLOSING LINE
-Use this exact closing (already chosen — do not change it):
-"{closing}"
-
-Sign off: {SENDER_NAME}, Fuelvia
-
-━━━━ ANTI-TEMPLATE CHECK (do this before finalising) ━━━━
-Ask yourself: Could this exact email be sent to a different creator by just swapping the name?
-If yes — rewrite it. The email MUST contain at least one detail so specific to {channel_name} and their content that it could not work for anyone else.
-That specific detail should be in paragraph 1 or 2.
-
-━━━━ ABSOLUTE RULES ━━━━
-- UNDER 120 WORDS total (count every word)
-- Plain text only — no bullets, no bold, no links, zero formatting
-- NEVER use: {_FORBIDDEN}
-- No generic openers. No "I hope" anything.
-- Goal: get a reply. Nothing else.
-
-Subject is already chosen: "{subject}"
-
-Respond ONLY as valid JSON — no markdown, no explanation:
-{{"subject": "{subject}", "body": "<the 5-paragraph email, under 120 words>"}}"""
+Respond ONLY as valid JSON, nothing else:
+{{"subject": "<personalised casual pain/curiosity subject>", "body": "<the casual email under 90 words, signed 'Founder, Fuelvia'>"}}"""
 
     data = _parse_json(call_claude(prompt, max_tokens=600))
     if data:
-        body = data.get("body", "").strip()
-        if body:
+        subject = (data.get("subject") or "").strip()
+        body    = (data.get("body") or "").strip()
+        if subject and body:
             return subject, body
 
-    # ── FALLBACK ──────────────────────────────────────────────
-    first_title = (
-        videos_data[0].get("title", "your recent video")
-        if videos_data and isinstance(videos_data[0], dict)
-        else "your recent video"
+    # ── FALLBACK (same casual, pain-led house style) ──────────
+    name    = _greeting_name(channel_name, lead_email)
+    greet   = f"Hey {name}," if name else "Hey there,"
+    subject = f"the content problem {niche} creators hit"
+    body = (
+        f"{greet}\n\n"
+        f"Most {niche} creators are in the same boat — they know content matters but don't have "
+        f"the time to script, edit and post consistently. So it either doesn't get done, or it goes "
+        f"out half-baked and doesn't convert.\n\n"
+        f"We handle the whole thing for you — scripting, editing, posting — so your brand actually "
+        f"brings in leads while you stay focused on the business.\n\n"
+        f"No worries if it's not for you. If maybe, let's talk.\n\n"
+        f"{SENDER_NAME}\nFounder, Fuelvia"
     )
-    return subject, (
-        f'"{first_title}" — {channel_name} is clearly building something serious in the {niche} space.\n\n'
-        f"The gap for most creators at your stage isn't ideas — it's turning raw footage into "
-        f"something that actually holds attention.\n\n"
-        f"We're Fuelvia, a video editing agency that helps {niche} creators turn raw footage "
-        f"into scroll-stopping content — delivered in 24 hours.\n\n"
-        f"{offer_variant}. If you love it we talk. If not, we disappear.\n\n"
-        f"{closing}\n\n"
-        f"{SENDER_NAME}, Fuelvia"
-    )
+    return subject, body
 
 
 # ── DAY 2 FOLLOW-UP ────────────────────────────────────────────

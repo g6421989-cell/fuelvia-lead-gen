@@ -1117,6 +1117,7 @@ def _run_send_emails(limit=None):
 
         merged = {
             "channel_name":     (channel_data.get("channel_name") or cname) if channel_data else cname,
+            "email":            email,
             "niche":            lead.get("niche") or "content creation",
             "subscriber_count": (channel_data.get("subscriber_count") or lead.get("subscriber_count") or 0) if channel_data else (lead.get("subscriber_count") or 0),
             "days_since_upload": days_since_last_video(videos),
@@ -1153,6 +1154,7 @@ def _run_send_emails(limit=None):
                 channel_name=cname,
                 youtube_url=lead.get("youtube_url") or "",
                 email_body=body,
+                subject=subject,
                 subscriber_count=merged.get("subscriber_count", 0),
                 niche=merged.get("niche", ""),
             )
