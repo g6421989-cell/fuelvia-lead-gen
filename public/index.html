@@ -113,6 +113,8 @@
         .badge-follow-up-sent { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
         .badge-follow-up-1    { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
         .badge-closed         { background: #f5f5f5; color: #555; border: 1px solid #ddd; }
+        .badge-queued         { background: #fff7ed; color: #9a5b13; border: 1px solid #f0cfa0; }
+        .badge-bounced        { background: #fdecec; color: #8a2222; border: 1px solid #e6b3b3; }
 
         /* ── FORMS ───────────────────────────────────────────────────── */
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
@@ -182,6 +184,20 @@
         .setup-field input:focus { outline: none; border-color: var(--black); }
         .setup-hint { font-size: 11px; color: var(--mid); margin-top: 6px; }
         .setup-actions { display: flex; gap: 10px; }
+
+        /* ── SEND-MODE BADGE (header) ────────────────────────────────── */
+        .mode-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+            padding: 5px 12px; border-radius: 20px; border: 1px solid var(--light); color: var(--charcoal); background: var(--offwhite); white-space: nowrap; }
+        .mode-badge.smtp     { background: #eef0f5; color: #3a4a6b; border-color: #c8d0e0; }
+        .mode-badge.instantly{ background: #eaf5ee; color: #1b4332; border-color: #a8d5bb; }
+        .mode-badge.notready { background: #f9eaea; color: #7b2d2d; border-color: #e0b8b8; }
+
+        /* ── CHOICE TOGGLE (segmented control in settings) ───────────── */
+        .mode-toggle { display: inline-flex; border: 1px solid var(--light); border-radius: 8px; overflow: hidden; background: var(--offwhite); }
+        .mode-btn { padding: 10px 22px; font-family: var(--body); font-size: 13px; font-weight: 600;
+            background: transparent; border: none; cursor: pointer; color: var(--mid); transition: all 0.15s; }
+        .mode-btn:hover { color: var(--black); }
+        .mode-btn.active { background: var(--black); color: var(--white); }
 
         /* ── SETTINGS ────────────────────────────────────────────────── */
         .settings-banner { padding: 14px 20px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
@@ -323,6 +339,11 @@
                 <div class="campaign-btn-title">↺ Check Replies</div>
                 <div class="campaign-btn-desc">Scan all 3 email accounts</div>
             </button>
+
+            <button class="campaign-btn" id="sbtn-instantly-sync" onclick="runInstantlySync()">
+                <div class="campaign-btn-title">⟳ Sync from Instantly</div>
+                <div class="campaign-btn-desc">Pull sent / replied / bounced status</div>
+            </button>
         </div>
 
         <!-- TOOLS nav -->
@@ -348,7 +369,10 @@
     <div class="main">
         <div class="topbar">
             <div class="page-title" id="page-title">Overview</div>
-            <div class="topbar-time" id="current-time"></div>
+            <div style="display:flex;align-items:center;gap:16px;">
+                <span class="mode-badge" id="mode-badge" title="Active email sending method">…</span>
+                <div class="topbar-time" id="current-time"></div>
+            </div>
         </div>
 
         <div class="content">
@@ -380,6 +404,11 @@
                             <div class="mini-stat-label">New</div>
                             <div class="mini-stat-value" id="stat-new-leads">0</div>
                             <div class="mini-stat-sub">Ready to contact</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Queued</div>
+                            <div class="mini-stat-value" id="stat-queued">0</div>
+                            <div class="mini-stat-sub">In Instantly, not sent</div>
                         </div>
                         <div class="mini-stat">
                             <div class="mini-stat-label">Contacted</div>
@@ -686,7 +715,13 @@ function switchTab(name, el) {
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
-const _PROVIDER_BY_GROUP = { 'Claude AI':'claude', 'Notion':'notion', 'YouTube':'youtube' };
+const _PROVIDER_BY_GROUP = { 'Claude AI':'claude', 'Notion':'notion', 'YouTube':'youtube', 'Sending Mode':'instantly' };
+
+function _pickChoice(key, val, btn) {
+    document.getElementById('set-' + key).value = val;
+    btn.parentElement.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
 
 function loadSettings() {
     fetch('/api/settings').then(r => r.json()).then(d => {
@@ -700,7 +735,19 @@ function loadSettings() {
             for (const f of fields) {
                 const srcClass = 'src-' + f.source;
                 const ph = f.secret && f.has_value ? `Saved (${f.value}) — leave blank to keep` : '';
-                if (f.kind === 'list') {
+                if (f.kind === 'choice') {
+                    const cur = f.value;
+                    const labels = { smtp:'Direct SMTP', instantly:'Instantly.ai' };
+                    const btns = (f.choices||[]).map(ch =>
+                        `<button type="button" class="mode-btn${ch===cur?' active':''}" onclick="_pickChoice('${f.key}','${ch}',this)">${labels[ch]||ch}</button>`
+                    ).join('');
+                    html += `<div class="setting-field">
+                        <label>${f.label}</label>
+                        <input type="hidden" id="set-${f.key}" value="${cur}">
+                        <div class="mode-toggle">${btns}</div>
+                        <div class="setting-meta">Choose how leads are emailed. <span class="src-tag ${srcClass}">${f.source}</span></div>
+                    </div>`;
+                } else if (f.kind === 'list') {
                     const val = f.secret ? '' : (f.value || '');
                     html += `<div class="setting-field">
                         <label>${f.label}</label>
@@ -745,9 +792,23 @@ function saveSettings() {
     .then(r => r.json()).then(d => {
         banner.classList.add(d.success ? 'ok' : 'err');
         banner.textContent = d.success ? `✅ ${d.message}` : `❌ ${d.error||'Save failed'}`;
-        if (d.success) loadSettings();   // refresh source tags
+        if (d.success) { loadSettings(); refreshSendModeBadge(); }   // refresh tags + header badge
         setTimeout(() => banner.classList.add('hidden'), 5000);
     }).catch(e => { banner.classList.add('err'); banner.textContent = '❌ ' + e; });
+}
+
+// ── Header send-mode badge (Direct SMTP / Instantly) ──────────────────
+function refreshSendModeBadge() {
+    fetch('/api/send-mode').then(r => r.json()).then(d => {
+        const badge = document.getElementById('mode-badge');
+        if (!badge) return;
+        const ready = d.ready !== false;
+        badge.textContent = (d.mode === 'instantly' ? 'Instantly.ai' : 'Direct SMTP') + (ready ? '' : ' ⚠');
+        badge.className = 'mode-badge ' + (d.mode === 'instantly' ? (ready ? 'instantly' : 'notready') : 'smtp');
+        badge.title = d.mode === 'instantly'
+            ? (ready ? 'Sending via Instantly.ai campaign' : 'Instantly selected — API key/campaign ID missing in Settings')
+            : 'Sending directly via SMTP accounts';
+    }).catch(() => {});
 }
 
 function testProvider(provider, btn) {
@@ -771,6 +832,7 @@ function loadDashboard() {
         s('stat-emails',         d.emails_sent);
         s('stat-replies',        d.replies_received);
         s('stat-new-leads',      d.new_leads);
+        s('stat-queued',         d.queued);
         s('stat-contacted',      d.contacted);
         s('stat-followup',       d.followup_sent);
         s('stat-replied-detail', d.replies_received);
@@ -989,7 +1051,7 @@ function updateScraperStatus() {
 // ══════════════════════════════════════════════════════════════════════
 
 function _setSidebarBtnActive(id) {
-    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
         const el = document.getElementById(b);
         if (el) el.classList.remove('active-action');
     });
@@ -1125,6 +1187,18 @@ function runCheckReplies() {
     }).catch(e => alert('Error: ' + e.message));
 }
 
+// Pull real send/reply/bounce status from Instantly and reconcile Notion + UI
+function runInstantlySync() {
+    _showOutreachTab();
+    _setSidebarBtnActive('sbtn-instantly-sync');
+    document.getElementById('action-title').textContent = 'Sync from Instantly';
+    fetch('/api/instantly-sync', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _switchToLive('Checking Instantly for sent / replied / bounced…');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
 function stopEmailAction() {
     fetch('/api/stop-email-action', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
     .then(r => r.json()).then(d => {
@@ -1161,6 +1235,7 @@ function updateOutreachStatus() {
             send_emails:    'Cold emailing New leads',
             send_followup:  'Following up Contacted leads',
             check_replies:  'Scanning email inboxes',
+            instantly_sync: 'Syncing status from Instantly',
         };
         if (d.action) {
             document.getElementById('action-subtitle').textContent =
@@ -1191,7 +1266,7 @@ function updateOutreachStatus() {
         if (status === 'completed' || status === 'stopped') {
             loadDashboard();
             // Remove active highlight from sidebar button
-            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
                 const el = document.getElementById(b);
                 if (el) el.classList.remove('active-action');
             });
@@ -1262,6 +1337,7 @@ function showReplyBody(r) {
 // ── No-auth init: password removed, open the dashboard immediately ────
 loadDashboard();
 startPolling();
+refreshSendModeBadge();
 </script>
 </body>
 </html>
