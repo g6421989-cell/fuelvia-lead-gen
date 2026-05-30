@@ -11,6 +11,7 @@
 # from the settings store (UI-editable, .env fallback).
 # ============================================================
 
+import json
 import requests
 import settings_store
 
@@ -167,42 +168,53 @@ def _truthy(v) -> bool:
 
 def classify_lead_status(lead: dict) -> str:
     """
-    Map a raw Instantly lead object to one of:
+    Map a raw Instantly v2 lead object to one of:
       'replied' | 'bounced' | 'unsubscribed' | 'sent' | 'queued'
 
-    Defensive: Instantly's exact field names/enums vary, so we check several
-    likely keys. Priority (most decisive first): replied > bounced >
-    unsubscribed > sent > queued. Adjust here once a real lead payload is seen.
+    Grounded in the REAL v2 lead shape (confirmed via a live test lead):
+      status (int), email_reply_count, email_open_count, email_click_count,
+      status_summary (dict, e.g. {} when no activity), verification_status.
+    Priority (most decisive first): replied > bounced > unsubscribed > sent > queued.
+
+    NOTE: the v2 lead-list object has no plain "email_sent_count". Until a lead
+    has activity, opens/clicks/replies are the reliable "it was sent" signals,
+    plus whatever status_summary fills in. When the campaign first sends for real
+    we should confirm the exact 'sent' marker (status_summary key or status int)
+    and, if needed, switch to the /api/v2/emails endpoint for definitive sends.
     """
     if not isinstance(lead, dict):
         return "queued"
+    g = lead.get
 
-    g = lead.get  # shorthand
+    # status_summary is a DICT in v2 — flatten to a searchable blob
+    summary = g("status_summary")
+    summary = summary if isinstance(summary, dict) else {}
+    blob  = json.dumps(summary).lower()
+    label = str(g("lead_status") or "").lower()
 
-    # ── Replied (a human reply — most valuable) ──
-    reply_count = g("email_reply_count") or g("reply_count") or g("replies") or 0
-    if _truthy(reply_count) or _truthy(g("is_replied")) or _truthy(g("replied")):
-        return "replied"
-    # lead_status / status enums that some accounts use for "replied"
-    status_label = str(g("status_summary") or g("lead_status") or "").lower()
-    if "repl" in status_label or "interested" in status_label:
+    reply_count = g("email_reply_count") or g("reply_count") or 0
+    open_count  = g("email_open_count")  or 0
+    click_count = g("email_click_count") or 0
+
+    # ── Replied (human reply — most valuable) ──
+    if _truthy(reply_count) or _truthy(g("is_replied")) \
+       or "repl" in blob or "interested" in blob or "interested" in label:
         return "replied"
 
     # ── Bounced ──
-    if _truthy(g("is_bounced")) or _truthy(g("bounced")) or "bounc" in status_label:
-        return "bounced"
     verif = str(g("verification_status") or "").lower()
-    if "bounc" in verif or verif in ("invalid", "risky"):
+    if _truthy(g("is_bounced")) or "bounc" in blob or "bounc" in label \
+       or "bounc" in verif or verif == "invalid":
         return "bounced"
 
     # ── Unsubscribed ──
-    if _truthy(g("is_unsubscribed")) or _truthy(g("unsubscribed")) or "unsub" in status_label:
+    if _truthy(g("is_unsubscribed")) or "unsub" in blob or "unsub" in label:
         return "unsubscribed"
 
-    # ── Sent (at least one email went out) ──
-    sent_count = (g("email_sent_count") or g("emails_sent_count")
-                  or g("sent_count") or g("emails_sent") or 0)
-    if _truthy(sent_count) or "contact" in status_label or "active" in status_label:
+    # ── Sent (no plain sent_count in v2; use activity + summary as proxy) ──
+    sent_count = g("email_sent_count") or g("emails_sent") or 0
+    if _truthy(sent_count) or _truthy(open_count) or _truthy(click_count) \
+       or "sent" in blob or "contacted" in blob:
         return "sent"
 
     return "queued"
