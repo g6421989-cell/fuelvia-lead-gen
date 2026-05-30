@@ -66,6 +66,21 @@ SCHEMA = {
         "env": [], "default": [],
     },
 
+    # ── Sending mode (Direct SMTP vs Instantly.ai) ──
+    "SEND_MODE": {
+        "group": "Sending Mode", "label": "Email Sending Method", "secret": False,
+        "kind": "choice", "choices": ["smtp", "instantly"],
+        "env": ["SEND_MODE"], "default": "smtp",
+    },
+    "INSTANTLY_API_KEY": {
+        "group": "Sending Mode", "label": "Instantly API Key", "secret": True, "kind": "str",
+        "env": ["INSTANTLY_API_KEY"], "default": "",
+    },
+    "INSTANTLY_CAMPAIGN_ID": {
+        "group": "Sending Mode", "label": "Instantly Campaign ID", "secret": False, "kind": "str",
+        "env": ["INSTANTLY_CAMPAIGN_ID"], "default": "",
+    },
+
     # ── System tunables ──
     "EMAIL_ROTATION_DELAY": {
         "group": "System", "label": "Delay Between Emails (seconds)", "secret": False, "kind": "int",
@@ -102,12 +117,17 @@ def _save(data):
 
 def _coerce(key, value):
     """Coerce a raw value to the schema kind."""
-    kind = SCHEMA.get(key, {}).get("kind", "str")
+    spec = SCHEMA.get(key, {})
+    kind = spec.get("kind", "str")
     if kind == "int":
         try:
             return int(value)
         except (TypeError, ValueError):
-            return SCHEMA[key].get("default", 0)
+            return spec.get("default", 0)
+    if kind == "choice":
+        v = str(value).strip().lower()
+        choices = spec.get("choices", [])
+        return v if v in choices else spec.get("default", (choices[0] if choices else ""))
     if kind == "list":
         if isinstance(value, list):
             return [str(v).strip() for v in value if str(v).strip()]
@@ -242,6 +262,7 @@ def get_all_for_ui():
             "label": spec["label"],
             "secret": spec.get("secret", False),
             "kind": spec["kind"],
+            "choices": spec.get("choices", []),
             "value": display,
             "has_value": has_value,
             "source": source,

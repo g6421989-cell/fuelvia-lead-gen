@@ -629,9 +629,31 @@ def api_settings_test():
             n = len(settings_store.get_list("YOUTUBE_API_KEYS"))
             return jsonify({"success": True, "message": f"YouTube OK — {n} key(s), API reachable."})
 
+        if provider == "instantly":
+            from instantly_helpers import test_instantly
+            ok, msg = test_instantly()
+            return jsonify({"success": ok, "message": msg})
+
         return jsonify({"success": False, "message": f"Unknown provider: {provider}"})
     except Exception as e:
         return jsonify({"success": False, "message": f"{provider} test failed: {str(e)[:200]}"})
+
+
+@app.route("/api/send-mode")
+def api_send_mode():
+    """Current send mode + readiness — used by the dashboard header badge."""
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    mode = settings_store.get("SEND_MODE") or "smtp"
+    ready = True
+    if mode == "instantly":
+        from instantly_helpers import instantly_ready
+        ready = instantly_ready()
+    return jsonify({
+        "mode": mode,
+        "label": "Instantly.ai" if mode == "instantly" else "Direct SMTP",
+        "ready": ready,
+    })
 
 
 # ── Leads table ────────────────────────────────────────────────
@@ -1112,6 +1134,45 @@ def _run_send_emails(limit=None):
 
         if claude_failed:
             _alog(f"[{_ts()}] ⚠  WARNING: Claude API failed — fallback template used for {cname}")
+
+        # ── SEND MODE: Instantly.ai (push lead) vs Direct SMTP (below) ──
+        # Direct SMTP code is left completely untouched; in Instantly mode we
+        # push the lead + personalization to the campaign and skip SMTP.
+        if settings_store.get("SEND_MODE") == "instantly":
+            from instantly_helpers import add_lead_to_instantly
+            _alog(f"[{_ts()}]    [{i}/{total}] {cname} — adding to Instantly campaign…")
+            iok, ierr = add_lead_to_instantly(
+                email=email,
+                channel_name=cname,
+                youtube_url=lead.get("youtube_url") or "",
+                email_body=body,
+                subscriber_count=merged.get("subscriber_count", 0),
+                niche=merged.get("niche", ""),
+            )
+            if iok:
+                # Same Notion flow as SMTP: status FIRST (double-send guard)
+                try:
+                    notion.update_lead_status(lead["id"], "Contacted")
+                except Exception as ne:
+                    _alog(f"[{_ts()}] ❌ CRITICAL: Status update failed for {cname}: {ne}")
+                try:
+                    notion.save_day1_email_body(lead["id"], body)
+                except Exception as ne:
+                    _alog(f"[{_ts()}] ⚠  Could not save email body for {cname}: {ne}")
+                sent += 1
+                with _email_action_lock:
+                    _email_action_state["progress"] = int(sent / total * 100)
+                _alog(f"[{_ts()}] ✅ Added to Instantly [{sent}/{total}]: {cname} → {email}")
+            else:
+                _alog(f"[{_ts()}] ❌ Instantly failed for {cname} ({email}): {ierr}")
+
+            # small pause to respect Instantly API rate limits (stop-aware)
+            if i < total and not _email_action_stop.is_set():
+                for _ in range(2):
+                    if _email_action_stop.is_set():
+                        break
+                    time.sleep(0.5)
+            continue   # skip the Direct SMTP block (left untouched)
 
         # ── Pick account with room (rotate past full ones) ────
         account = None
