@@ -563,11 +563,13 @@ def api_dashboard_data():
             "emails_sent":      emails_sent,
             "replies_received": counts.get("Replied", 0),
             "new_leads":        counts.get("New",         0),
+            "queued":           counts.get("Queued",      0),
             "contacted":        counts.get("Contacted",   0),
             "followup_sent":    (counts.get("Follow-up 1", 0) +
                                  counts.get("Follow-up Sent", 0) +
                                  counts.get("Follow-up 1 Sent", 0)),
             "closed":           counts.get("Closed", 0),
+            "bounced":          counts.get("Bounced", 0),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1150,9 +1152,10 @@ def _run_send_emails(limit=None):
                 niche=merged.get("niche", ""),
             )
             if iok:
-                # Same Notion flow as SMTP: status FIRST (double-send guard)
+                # Lead is QUEUED in Instantly (not sent yet). "Sync from Instantly"
+                # later flips it to Contacted/Replied/Bounced based on real state.
                 try:
-                    notion.update_lead_status(lead["id"], "Contacted")
+                    notion.update_lead_status(lead["id"], "Queued")
                 except Exception as ne:
                     _alog(f"[{_ts()}] ❌ CRITICAL: Status update failed for {cname}: {ne}")
                 try:
@@ -1162,7 +1165,7 @@ def _run_send_emails(limit=None):
                 sent += 1
                 with _email_action_lock:
                     _email_action_state["progress"] = int(sent / total * 100)
-                _alog(f"[{_ts()}] ✅ Added to Instantly [{sent}/{total}]: {cname} → {email}")
+                _alog(f"[{_ts()}] ✅ Queued in Instantly [{sent}/{total}]: {cname} → {email}")
             else:
                 _alog(f"[{_ts()}] ❌ Instantly failed for {cname} ({email}): {ierr}")
 
@@ -1558,6 +1561,139 @@ def _run_check_replies():
             _email_action_state["status"] = "error"
 
 
+def _blacklist_lead(lead):
+    """Best-effort: extract channel_id from the lead's YouTube URL and blacklist it."""
+    try:
+        from channel_blacklist import add_to_blacklist
+        m = _YT_CHANNEL_RE.search(lead.get("youtube_url") or "")
+        if m:
+            add_to_blacklist(m.group(1), lead.get("channel_name") or "")
+    except Exception:
+        pass
+
+
+def _run_instantly_sync():
+    """
+    Background: pull each lead's real state from the Instantly campaign and
+    reconcile Notion + the dashboard.
+      sent        -> Contacted (+ Email Sent From = Instantly)
+      replied     -> Replied
+      bounced     -> Bounced  (+ blacklist)
+      unsubscribed-> Closed   (+ blacklist)
+      queued      -> left as Queued
+    Monotonic: never downgrades a terminal status (Replied/Closed/Bounced).
+    """
+    from instantly_helpers import instantly_ready, get_campaign_leads, classify_lead_status
+    _email_action_stop.clear()
+    with _email_action_lock:
+        _email_action_state.update({
+            "status": "running", "action": "instantly_sync",
+            "progress": 0, "total": 0, "logs": [],
+        })
+
+    if not instantly_ready():
+        _alog(f"[{_ts()}] ❌ Instantly not configured — add API key + Campaign ID in Settings")
+        with _email_action_lock:
+            _email_action_state["status"] = "error"
+        return
+
+    # ── 1) Pull all campaign leads from Instantly (paginated) ──────
+    _alog(f"[{_ts()}]    Connecting to Instantly campaign…")
+    inst_status = {}   # email(lower) -> bucket
+    cursor, pages = None, 0
+    while True:
+        if _email_action_stop.is_set():
+            _alog(f"[{_ts()}] ⏹ Stopped by user")
+            with _email_action_lock: _email_action_state["status"] = "stopped"
+            return
+        items, cursor, err = get_campaign_leads(starting_after=cursor, limit=100)
+        if err:
+            _alog(f"[{_ts()}] ❌ Instantly API error: {err}")
+            with _email_action_lock: _email_action_state["status"] = "error"
+            return
+        for it in items:
+            em = str((it or {}).get("email") or "").strip().lower()
+            if em:
+                inst_status[em] = classify_lead_status(it)
+        pages += 1
+        _alog(f"[{_ts()}]    Pulled {len(inst_status)} Instantly lead(s)…")
+        if not cursor or not items or pages > 200:
+            break
+
+    if not inst_status:
+        _alog(f"[{_ts()}] ✅ No leads found in the Instantly campaign")
+        with _email_action_lock:
+            _email_action_state.update({"status": "completed", "progress": 100})
+        return
+
+    # ── 2) Reconcile against Notion (match by email) ───────────────
+    _alog(f"[{_ts()}]    Matching {len(inst_status)} Instantly lead(s) against Notion…")
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+    except Exception as e:
+        _alog(f"[{_ts()}] ❌ Notion fetch failed: {e}")
+        with _email_action_lock: _email_action_state["status"] = "error"
+        return
+
+    TERMINAL = {"Replied", "Closed", "Bounced"}
+    c = {"sent": 0, "replied": 0, "bounced": 0, "unsubscribed": 0, "queued": 0, "skipped": 0}
+    leads = [_extract_full_lead(r) for r in records]
+    total = len(leads)
+    with _email_action_lock: _email_action_state["total"] = total
+
+    for idx, lead in enumerate(leads, 1):
+        if _email_action_stop.is_set():
+            _alog(f"[{_ts()}] ⏹ Stopped by user")
+            with _email_action_lock: _email_action_state["status"] = "stopped"
+            return
+        with _email_action_lock:
+            _email_action_state["progress"] = int(idx / total * 100) if total else 100
+
+        email  = str(lead.get("email") or "").strip().lower()
+        bucket = inst_status.get(email)
+        if not bucket:
+            continue   # this lead isn't in the Instantly campaign
+        cur   = lead.get("status") or "New"
+        pid   = lead.get("id")
+        cname = lead.get("channel_name") or email
+
+        if cur in TERMINAL:      # monotonic — never revert a terminal status
+            c["skipped"] += 1
+            continue
+
+        try:
+            if bucket == "replied":
+                if cur != "Replied":
+                    notion.mark_replied(email)
+                    c["replied"] += 1
+                    _alog(f"[{_ts()}] 💬 Replied: {cname}")
+            elif bucket == "bounced":
+                notion.update_lead_status(pid, "Bounced")
+                _blacklist_lead(lead); c["bounced"] += 1
+                _alog(f"[{_ts()}] ⚠  Bounced: {cname}")
+            elif bucket == "unsubscribed":
+                notion.update_lead_status(pid, "Closed")
+                _blacklist_lead(lead); c["unsubscribed"] += 1
+                _alog(f"[{_ts()}] 🚫 Unsubscribed: {cname}")
+            elif bucket == "sent":
+                if cur != "Contacted":
+                    notion.update_lead_status(pid, "Contacted")
+                    try: notion.update_email_sent_from(pid, "Instantly")
+                    except Exception: pass
+                    c["sent"] += 1
+                    _alog(f"[{_ts()}] ✅ Sent → Contacted: {cname}")
+            else:
+                c["queued"] += 1
+        except Exception as ue:
+            _alog(f"[{_ts()}] ⚠  Update failed for {cname}: {str(ue)[:120]}")
+
+    _alog(f"[{_ts()}] 🏁 Instantly sync done — sent→contacted {c['sent']}, replied {c['replied']}, "
+          f"bounced {c['bounced']}, unsub {c['unsubscribed']}, still-queued {c['queued']}")
+    with _email_action_lock:
+        _email_action_state.update({"status": "completed", "progress": 100})
+
+
 # ── Email action API endpoints ─────────────────────────────────
 
 def _start_action(target_fn, name: str):
@@ -1602,6 +1738,11 @@ def api_send_followup():
 @app.route("/api/check-replies", methods=["POST"])
 def api_check_replies():
     return _start_action(_run_check_replies, "check-replies")
+
+
+@app.route("/api/instantly-sync", methods=["POST"])
+def api_instantly_sync():
+    return _start_action(_run_instantly_sync, "instantly-sync")
 
 
 @app.route("/api/campaign-counts")
@@ -1999,8 +2140,10 @@ def get_dashboard_data():
                             counts.get("Replied", 0) + counts.get("Closed", 0)),
         "replies_received": counts.get("Replied", 0),
         "new_leads":        counts.get("New", 0),
+        "queued":           counts.get("Queued", 0),
         "contacted":        counts.get("Contacted", 0),
         "closed":           counts.get("Closed", 0),
+        "bounced":          counts.get("Bounced", 0),
     }
 
 

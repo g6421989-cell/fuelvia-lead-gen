@@ -113,6 +113,8 @@
         .badge-follow-up-sent { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
         .badge-follow-up-1    { background: #fdf5ff; color: #6b2f8c; border: 1px solid #dbb8f0; }
         .badge-closed         { background: #f5f5f5; color: #555; border: 1px solid #ddd; }
+        .badge-queued         { background: #fff7ed; color: #9a5b13; border: 1px solid #f0cfa0; }
+        .badge-bounced        { background: #fdecec; color: #8a2222; border: 1px solid #e6b3b3; }
 
         /* ── FORMS ───────────────────────────────────────────────────── */
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
@@ -337,6 +339,11 @@
                 <div class="campaign-btn-title">↺ Check Replies</div>
                 <div class="campaign-btn-desc">Scan all 3 email accounts</div>
             </button>
+
+            <button class="campaign-btn" id="sbtn-instantly-sync" onclick="runInstantlySync()">
+                <div class="campaign-btn-title">⟳ Sync from Instantly</div>
+                <div class="campaign-btn-desc">Pull sent / replied / bounced status</div>
+            </button>
         </div>
 
         <!-- TOOLS nav -->
@@ -397,6 +404,11 @@
                             <div class="mini-stat-label">New</div>
                             <div class="mini-stat-value" id="stat-new-leads">0</div>
                             <div class="mini-stat-sub">Ready to contact</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-label">Queued</div>
+                            <div class="mini-stat-value" id="stat-queued">0</div>
+                            <div class="mini-stat-sub">In Instantly, not sent</div>
                         </div>
                         <div class="mini-stat">
                             <div class="mini-stat-label">Contacted</div>
@@ -820,6 +832,7 @@ function loadDashboard() {
         s('stat-emails',         d.emails_sent);
         s('stat-replies',        d.replies_received);
         s('stat-new-leads',      d.new_leads);
+        s('stat-queued',         d.queued);
         s('stat-contacted',      d.contacted);
         s('stat-followup',       d.followup_sent);
         s('stat-replied-detail', d.replies_received);
@@ -1038,7 +1051,7 @@ function updateScraperStatus() {
 // ══════════════════════════════════════════════════════════════════════
 
 function _setSidebarBtnActive(id) {
-    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
         const el = document.getElementById(b);
         if (el) el.classList.remove('active-action');
     });
@@ -1174,6 +1187,18 @@ function runCheckReplies() {
     }).catch(e => alert('Error: ' + e.message));
 }
 
+// Pull real send/reply/bounce status from Instantly and reconcile Notion + UI
+function runInstantlySync() {
+    _showOutreachTab();
+    _setSidebarBtnActive('sbtn-instantly-sync');
+    document.getElementById('action-title').textContent = 'Sync from Instantly';
+    fetch('/api/instantly-sync', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _switchToLive('Checking Instantly for sent / replied / bounced…');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
 function stopEmailAction() {
     fetch('/api/stop-email-action', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
     .then(r => r.json()).then(d => {
@@ -1210,6 +1235,7 @@ function updateOutreachStatus() {
             send_emails:    'Cold emailing New leads',
             send_followup:  'Following up Contacted leads',
             check_replies:  'Scanning email inboxes',
+            instantly_sync: 'Syncing status from Instantly',
         };
         if (d.action) {
             document.getElementById('action-subtitle').textContent =
@@ -1240,7 +1266,7 @@ function updateOutreachStatus() {
         if (status === 'completed' || status === 'stopped') {
             loadDashboard();
             // Remove active highlight from sidebar button
-            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies'].forEach(b => {
+            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
                 const el = document.getElementById(b);
                 if (el) el.classList.remove('active-action');
             });
