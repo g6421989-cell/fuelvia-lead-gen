@@ -200,6 +200,10 @@ class NotionManager:
             return True, result["results"][0]["id"]
         return False, None
 
+    def archive_lead(self, page_id):
+        """Archive a lead (Notion soft-delete → Trash, recoverable ~30 days)."""
+        return self._request("PATCH", f"/pages/{page_id}", json={"archived": True})
+
     def update_lead_status(self, page_id, status, follow_up_stage=None):
         """Update lead status in Notion"""
         properties = {

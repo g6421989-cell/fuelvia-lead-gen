@@ -346,6 +346,21 @@
             </button>
         </div>
 
+        <!-- LEAD QUALITY -->
+        <div class="nav-section">
+            <div class="nav-label">Lead Quality</div>
+
+            <button class="campaign-btn" id="sbtn-qualify-preview" onclick="runQualifyPreview()">
+                <div class="campaign-btn-title">🔍 Qualify Leads (Preview)</div>
+                <div class="campaign-btn-desc">Score New leads, flag off-target — no changes</div>
+            </button>
+
+            <button class="campaign-btn" id="sbtn-qualify-apply" onclick="runQualifyApply()">
+                <div class="campaign-btn-title">🧹 Apply Cleanup</div>
+                <div class="campaign-btn-desc">Archive the flagged leads (recoverable)</div>
+            </button>
+        </div>
+
         <!-- TOOLS nav -->
         <div class="nav-section">
             <div class="nav-label">Tools</div>
@@ -1051,7 +1066,7 @@ function updateScraperStatus() {
 // ══════════════════════════════════════════════════════════════════════
 
 function _setSidebarBtnActive(id) {
-    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
+    ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync','sbtn-qualify-preview','sbtn-qualify-apply'].forEach(b => {
         const el = document.getElementById(b);
         if (el) el.classList.remove('active-action');
     });
@@ -1199,6 +1214,39 @@ function runInstantlySync() {
     }).catch(e => alert('Error: ' + e.message));
 }
 
+// Re-qualify New leads (preview only — flags off-target, removes nothing)
+function runQualifyPreview() {
+    if (!confirm('Re-qualify all New leads?\n\nIt re-checks each channel (entertainment, CTAs, B2B signals, activity, subscribers) and flags off-target ones. NOTHING is removed — you review the list first, then choose to apply.')) return;
+    _showOutreachTab();
+    _setSidebarBtnActive('sbtn-qualify-preview');
+    document.getElementById('action-title').textContent = 'Qualify Leads — Preview';
+    fetch('/api/qualify-preview', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(r => r.json()).then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        _switchToLive('Scoring each New lead…');
+    }).catch(e => alert('Error: ' + e.message));
+}
+
+// Archive the leads flagged by the last preview (after explicit confirm)
+function runQualifyApply() {
+    fetch('/api/qualify-status').then(r => r.json()).then(st => {
+        const n = st.cut_count || 0;
+        if (n === 0) {
+            alert('No leads are flagged.\n\nRun "Qualify Leads (Preview)" first, then review the CUT list before applying.');
+            return;
+        }
+        if (!confirm(`Archive ${n} flagged lead(s)?\n\nThey move to Notion Trash (recoverable ~30 days), not permanently deleted.`)) return;
+        _showOutreachTab();
+        _setSidebarBtnActive('sbtn-qualify-apply');
+        document.getElementById('action-title').textContent = 'Apply Cleanup';
+        fetch('/api/qualify-apply', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+        .then(r => r.json()).then(d => {
+            if (d.error) { alert('Error: ' + d.error); return; }
+            _switchToLive(`Archiving ${n} flagged lead(s)…`);
+        }).catch(e => alert('Error: ' + e.message));
+    }).catch(e => alert('Error: ' + e.message));
+}
+
 function stopEmailAction() {
     fetch('/api/stop-email-action', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
     .then(r => r.json()).then(d => {
@@ -1236,6 +1284,8 @@ function updateOutreachStatus() {
             send_followup:  'Following up Contacted leads',
             check_replies:  'Scanning email inboxes',
             instantly_sync: 'Syncing status from Instantly',
+            qualify_preview:'Scoring & flagging New leads',
+            qualify_apply:  'Archiving flagged leads',
         };
         if (d.action) {
             document.getElementById('action-subtitle').textContent =
@@ -1266,7 +1316,7 @@ function updateOutreachStatus() {
         if (status === 'completed' || status === 'stopped') {
             loadDashboard();
             // Remove active highlight from sidebar button
-            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync'].forEach(b => {
+            ['sbtn-send-emails','sbtn-send-followup','sbtn-check-replies','sbtn-instantly-sync','sbtn-qualify-preview','sbtn-qualify-apply'].forEach(b => {
                 const el = document.getElementById(b);
                 if (el) el.classList.remove('active-action');
             });

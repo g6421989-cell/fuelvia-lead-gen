@@ -152,6 +152,11 @@ _email_action_state = {
 _email_action_stop = threading.Event()
 _email_action_lock = threading.Lock()
 
+# Holds the result of the most recent "Qualify Leads" PREVIEW so the
+# follow-up "Apply Cleanup" step archives exactly the leads you reviewed.
+_qualify_state = {"cut_ids": [], "cut_preview": [], "summary": {}, "preview_at": None}
+_qualify_lock  = threading.Lock()
+
 
 # ── Shared timestamp helper ────────────────────────────────────
 
@@ -1694,6 +1699,119 @@ def _run_instantly_sync():
         _email_action_state.update({"status": "completed", "progress": 100})
 
 
+def _run_qualify_preview():
+    """
+    Re-qualify every 'New' lead with the system's own intelligence
+    (smart_scorer.intelligent_score_channel → entertainment/no-CTA/inactive get
+    cut). PREVIEW ONLY: nothing is archived. Stores the flagged page IDs so the
+    'Apply Cleanup' step can archive exactly what you reviewed.
+    Fetch failures are KEPT (never auto-cut on missing data).
+    """
+    from smart_scorer import intelligent_score_channel
+    _email_action_stop.clear()
+    with _email_action_lock:
+        _email_action_state.update({"status": "running", "action": "qualify_preview",
+                                    "progress": 0, "total": 0, "logs": []})
+    try:
+        notion  = NotionManager()
+        records = notion.get_all_leads()
+    except Exception as e:
+        _alog(f"[{_ts()}] ❌ Notion fetch failed: {e}")
+        with _email_action_lock: _email_action_state["status"] = "error"
+        return
+
+    new_leads = [l for l in (_extract_full_lead(r) for r in records) if l.get("status") == "New"]
+    total = len(new_leads)
+    with _email_action_lock: _email_action_state["total"] = total
+    _alog(f"[{_ts()}] ▷ Qualifying {total} New lead(s) — PREVIEW only, nothing removed yet")
+
+    keep, cut_ids, cut_preview = 0, [], []
+    for i, lead in enumerate(new_leads, 1):
+        if _email_action_stop.is_set():
+            _alog(f"[{_ts()}] ⏹ Stopped by user")
+            with _email_action_lock: _email_action_state["status"] = "stopped"
+            return
+        with _email_action_lock:
+            _email_action_state["progress"] = int(i / total * 100) if total else 100
+        cname = lead.get("channel_name") or lead.get("email") or "?"
+
+        try:
+            cdata, videos = _fetch_youtube_for_lead(lead.get("youtube_url") or "")
+        except Exception:
+            cdata, videos = {}, []
+
+        if not cdata:   # couldn't verify → keep to be safe (never cut on missing data)
+            keep += 1
+            _alog(f"[{_ts()}] [{i}/{total}] ⚠ {cname} — couldn't fetch YouTube, KEPT (unverified)")
+            continue
+
+        cdata["email"] = lead.get("email") or ""
+        if videos:
+            cdata["last_video_date"] = videos[0].get("published_at", "")
+        if not cdata.get("subscriber_count"):
+            cdata["subscriber_count"] = lead.get("subscriber_count") or 0
+
+        result    = intelligent_score_channel(cdata, videos, days_since_last_video(videos))
+        score     = result.get("score", 0)
+        qualified = result.get("qualified", False)
+        reason    = (result.get("reason") or "").replace("✅", "").replace("❌", "").strip()
+
+        if qualified:
+            keep += 1
+            _alog(f"[{_ts()}] [{i}/{total}] ✅ KEEP  {cname}  (score {score}/10)")
+        else:
+            cut_ids.append(lead["id"])
+            cut_preview.append({"name": cname, "score": score, "reason": reason})
+            _alog(f"[{_ts()}] [{i}/{total}] ✂ CUT   {cname}  (score {score}/10) — {reason}")
+
+    with _qualify_lock:
+        _qualify_state.update({"cut_ids": cut_ids, "cut_preview": cut_preview,
+                               "summary": {"total": total, "keep": keep, "cut": len(cut_ids)},
+                               "preview_at": _ts()})
+    _alog(f"[{_ts()}] 🏁 Preview complete — {keep} qualified, {len(cut_ids)} to cut.")
+    if cut_ids:
+        _alog(f"[{_ts()}] 👉 Review the CUT list above, then click 'Apply Cleanup' to archive "
+              f"the {len(cut_ids)} flagged lead(s). (Recoverable from Notion Trash.)")
+    with _email_action_lock:
+        _email_action_state.update({"status": "completed", "progress": 100})
+
+
+def _run_qualify_apply():
+    """Archive the leads flagged by the most recent preview (recoverable)."""
+    _email_action_stop.clear()
+    with _email_action_lock:
+        _email_action_state.update({"status": "running", "action": "qualify_apply",
+                                    "progress": 0, "total": 0, "logs": []})
+    with _qualify_lock:
+        cut_ids = list(_qualify_state.get("cut_ids") or [])
+    if not cut_ids:
+        _alog(f"[{_ts()}] ⚠ Nothing to apply — run 'Qualify Leads (Preview)' first.")
+        with _email_action_lock: _email_action_state["status"] = "completed"
+        return
+
+    notion = NotionManager()
+    total, done = len(cut_ids), 0
+    with _email_action_lock: _email_action_state["total"] = total
+    _alog(f"[{_ts()}] ▷ Archiving {total} flagged lead(s) — recoverable from Notion Trash")
+    for i, pid in enumerate(cut_ids, 1):
+        if _email_action_stop.is_set():
+            _alog(f"[{_ts()}] ⏹ Stopped ({done}/{total} archived)")
+            with _email_action_lock: _email_action_state["status"] = "stopped"
+            return
+        try:
+            notion.archive_lead(pid); done += 1
+        except Exception as e:
+            _alog(f"[{_ts()}] ⚠ Archive failed for {pid}: {str(e)[:80]}")
+        with _email_action_lock:
+            _email_action_state["progress"] = int(i / total * 100)
+
+    with _qualify_lock:   # consume the list so it can't be applied twice
+        _qualify_state.update({"cut_ids": [], "cut_preview": [], "summary": {}, "preview_at": None})
+    _alog(f"[{_ts()}] 🏁 Cleanup done — {done}/{total} leads archived (now in Notion Trash).")
+    with _email_action_lock:
+        _email_action_state.update({"status": "completed", "progress": 100})
+
+
 # ── Email action API endpoints ─────────────────────────────────
 
 def _start_action(target_fn, name: str):
@@ -1743,6 +1861,29 @@ def api_check_replies():
 @app.route("/api/instantly-sync", methods=["POST"])
 def api_instantly_sync():
     return _start_action(_run_instantly_sync, "instantly-sync")
+
+
+@app.route("/api/qualify-preview", methods=["POST"])
+def api_qualify_preview():
+    return _start_action(_run_qualify_preview, "qualify-preview")
+
+
+@app.route("/api/qualify-apply", methods=["POST"])
+def api_qualify_apply():
+    return _start_action(_run_qualify_apply, "qualify-apply")
+
+
+@app.route("/api/qualify-status")
+def api_qualify_status():
+    """How many leads the last preview flagged for cutting (for the Apply confirm)."""
+    if not _auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    with _qualify_lock:
+        return jsonify({
+            "cut_count":  len(_qualify_state.get("cut_ids") or []),
+            "summary":    _qualify_state.get("summary") or {},
+            "preview_at": _qualify_state.get("preview_at"),
+        })
 
 
 @app.route("/api/campaign-counts")
